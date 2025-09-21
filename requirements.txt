@@ -1,0 +1,56 @@
+# Core RAG Framework
+raganything[all]
+
+# Multimodal Embeddings
+sentence-transformers
+clip-by-openai
+transformers
+torch
+torchvision
+
+# Vector Database
+chromadb
+
+# Document Processing
+PyMuPDF
+python-docx
+pytesseract
+Pillow
+
+# Audio Processing
+openai-whisper
+librosa
+soundfile
+
+# LLM and Generation
+accelerate
+bitsandbytes
+
+# Knowledge Graph
+networkx
+plotly
+pyvis
+
+# UI Frameworks
+gradio
+streamlit
+
+# Evaluation
+ragas
+datasets
+
+# Utilities
+numpy
+pandas
+scikit-learn
+tqdm
+loguru
+
+# Packaging
+pyinstaller
+auto-py-to-exe
+
+# Development
+pytest
+black
+flake8
