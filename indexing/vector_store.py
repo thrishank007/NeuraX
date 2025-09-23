@@ -159,11 +159,21 @@ class VectorStore:
         ids = []
         metadatas = []
         embedding_list = []
+        document_contents = []
         
         for i, doc in enumerate(documents):
             # Generate unique ID
             doc_id = f"{doc.get('file_type', 'unknown')}_{i}_{datetime.now().timestamp()}"
             ids.append(doc_id)
+            
+            # Prepare document content
+            content = doc.get('content', '')
+            if isinstance(content, list):
+                # If content is a list of paragraphs/chunks, join them
+                content = ' '.join([item.get('text', str(item)) if isinstance(item, dict) else str(item) for item in content])
+            elif isinstance(content, dict):
+                content = content.get('text', str(content))
+            document_contents.append(str(content))
             
             # Prepare metadata
             metadata = {
@@ -182,11 +192,12 @@ class VectorStore:
             metadatas.append(metadata)
             embedding_list.append(embeddings[i].tolist())
         
-        # Add to collection
+        # Add to collection with documents
         self.collection.add(
             ids=ids,
             embeddings=embedding_list,
-            metadatas=metadatas
+            metadatas=metadatas,
+            documents=document_contents
         )
     
     def _add_documents_progressively(self, documents: List[Dict], embeddings: np.ndarray) -> None:
@@ -208,6 +219,37 @@ class VectorStore:
             
             logger.debug(f"Added document chunk {i//chunk_size + 1}: {end_idx}/{len(documents)} documents")
     
+    def _standardize_query_embedding(self, query_embedding: np.ndarray, target_dim: int = 384) -> np.ndarray:
+        """
+        Standardize query embedding dimension to match collection embeddings
+        
+        Args:
+            query_embedding: Input query embedding
+            target_dim: Target dimension (default 384)
+            
+        Returns:
+            Standardized query embedding
+        """
+        current_dim = query_embedding.shape[0] if query_embedding.ndim == 1 else query_embedding.shape[-1]
+        
+        if current_dim == target_dim:
+            return query_embedding
+        elif current_dim > target_dim:
+            # Truncate to target dimension
+            logger.warning(f"Truncating query embedding from {current_dim} to {target_dim} dimensions")
+            return query_embedding[:target_dim] if query_embedding.ndim == 1 else query_embedding[..., :target_dim]
+        else:
+            # Pad with zeros to reach target dimension
+            logger.warning(f"Padding query embedding from {current_dim} to {target_dim} dimensions")
+            if query_embedding.ndim == 1:
+                padding = np.zeros(target_dim - current_dim)
+                return np.concatenate([query_embedding, padding])
+            else:
+                padding_shape = list(query_embedding.shape)
+                padding_shape[-1] = target_dim - current_dim
+                padding = np.zeros(padding_shape)
+                return np.concatenate([query_embedding, padding], axis=-1)
+
     def similarity_search(self, query_embedding: np.ndarray, k: int = 5, 
                          filters: Optional[Dict] = None, 
                          similarity_threshold: Optional[float] = None) -> List[Dict]:
@@ -229,8 +271,9 @@ class VectorStore:
                 if similarity_threshold is None:
                     similarity_threshold = SIMILARITY_THRESHOLD
                 
-                # Optimize query embedding
-                optimized_query = MemoryOptimizer.optimize_numpy_arrays([query_embedding])[0]
+                # Standardize and optimize query embedding
+                standardized_query = self._standardize_query_embedding(query_embedding)
+                optimized_query = MemoryOptimizer.optimize_numpy_arrays([standardized_query])[0]
                 
                 # Prepare query
                 query_embeddings = [optimized_query.tolist()]
@@ -246,7 +289,8 @@ class VectorStore:
                 results = self.collection.query(
                     query_embeddings=query_embeddings,
                     n_results=search_k,
-                    where=where_clause if where_clause else None
+                    where=where_clause if where_clause else None,
+                    include=['documents', 'metadatas', 'distances']  # Include documents in results
                 )
                 
                 # Format and filter results by similarity threshold
@@ -260,7 +304,8 @@ class VectorStore:
                             'id': results['ids'][0][i],
                             'distance': results['distances'][0][i],
                             'similarity_score': similarity_score,
-                            'metadata': results['metadatas'][0][i]
+                            'metadata': results['metadatas'][0][i],
+                            'document': results['documents'][0][i] if results.get('documents') and len(results['documents'][0]) > i else None
                         }
                         search_results.append(result)
                 
@@ -553,14 +598,13 @@ class VectorStore:
             'memory_before_percent': memory_before.memory_percent,
             'memory_after_percent': memory_after.memory_percent,
             'memory_freed_mb': (memory_before.used_memory - memory_after.used_memory) * 1024,
-            'recommendations': self.memory_manager.get_optimization_recommendations()
+            'recommendations': self.memory_manager.get_memory_recommendations()
         }
         
         logger.info(f"Memory optimization completed: "
-                   f"{memory_before.memory_percent:.1f}% -> {memory_after.memory_percent:.1f}%")
+                   f"{memory_before.memory_percent:.1f}% -> {memory_after.memory_percent:.1f}")
         
-        return optimization_result
-    
+        return optimization_result    
     def get_performance_report(self) -> Dict[str, Any]:
         """Get performance report for vector store operations"""
         return self.benchmarker.generate_performance_report()

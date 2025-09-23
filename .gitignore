@@ -1,5 +1,4 @@
 *.md
 .kiro
 venv
-tests
-test_*.py
+__pycache__

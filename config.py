@@ -25,53 +25,55 @@ EMBEDDING_MODELS = {
     "multimodal": "openai/clip-vit-base-patch32"
 }
 
-LLM_CONFIG = {
-    "model_name": "HuggingFaceTB/SmolVLM-500M-Instruct",  # SmolVLM 500M as lightweight multimodal model
-    "fallback_model": "HuggingFaceTB/SmolVLM-500M-Instruct",  # Same model as fallback
-    "text_fallback": "Qwen/Qwen3-0.6B",  # Lightweight text-only fallback
-    "quantization": True,
-    "max_length": 1024,  # Reduced for lighter memory usage
+# LM Studio Configuration - Replaces all HuggingFace model management
+LM_STUDIO_CONFIG = {
+    # LM Studio server configuration
+    "base_url": "http://localhost:1234/v1",  # LM Studio API endpoint
+    "timeout": 120,  # Request timeout in seconds
+    
+    # Model configuration
+    "gemma_model": "google/gemma-3n",  # Main multimodal model (has vision capability)
+    "qwen_model": "qwen/qwen3-4b-thinking-2507",  # Fallback for text-only (thinking mode)
+    
+    # Generation parameters
+    "max_tokens": 1024,
     "temperature": 0.7,
-    "device": "auto",  # auto-detect CUDA/CPU
-    "dtype": "float16",
-    "load_in_4bit": True,
-    "bnb_4bit_compute_dtype": "float16",
-    "bnb_4bit_use_double_quant": True,
-    "bnb_4bit_quant_type": "nf4",
-    "use_auth_token": False,  # These models don't require auth token
-    "trust_remote_code": True,
-    "hf_token": None,  # Set this or use HF_TOKEN environment variable for gated models
-    "pad_token_id": None,  # Will be set during model loading
-    "eos_token_id": None,  # Will be set during model loading
-    "max_new_tokens": 256,  # Reduced for lighter memory usage
+    "top_p": 0.9,
+    "max_context_length": 4096,
+    
+    # Model switching preferences
+    "prefer_gemma_for_multimodal": True,  # Use Gemma when images are involved
+    "prefer_qwen_for_reasoning": True,  # Use Qwen for complex text reasoning
+    
+    # Auto-switching based on query type
+    "auto_model_switching": True,
+    "multimodal_keywords": ["image", "picture", "photo", "visual", "diagram", "chart"],
+    "reasoning_keywords": ["analyze", "explain", "reasoning", "think", "logic", "step"],
+    
+    # Fallback configuration
+    "enable_fallback": True,  # Try alternative model if primary fails
+    "fallback_timeout": 30  # Shorter timeout for fallback attempts
+}
+
+# Legacy LLM_CONFIG for backward compatibility (now redirects to LM Studio)
+LLM_CONFIG = {
+    # Deprecated - Use LM_STUDIO_CONFIG instead
+    "use_lm_studio": True,  # Flag to use LM Studio instead of HuggingFace
+    "model_name": "gemma-3n",  # Simplified name for LM Studio
+    "fallback_model": "qwen3-4b-thinking",
+    "max_length": 1024,
+    "temperature": 0.7,
+    "use_multimodal": True,  # Enabled since Gemma supports vision
+    # All other HuggingFace-specific settings are ignored when use_lm_studio=True
+    "force_cpu": False,  # Not applicable for LM Studio
+    "device": "auto",  # Handled by LM Studio
+    "quantization": False,  # Handled by LM Studio
+    "trust_remote_code": True,  # Not applicable
+    "max_new_tokens": 1024,
     "do_sample": True,
     "top_p": 0.9,
     "top_k": 50,
-    "repetition_penalty": 1.1,
-    "no_repeat_ngram_size": 3,
-    # Multimodal configurations
-    "use_multimodal": True,  # Enable multimodal capabilities
-    "image_token": "<image>",  # Special token for image inputs
-    "max_image_size": 448,  # Maximum image size for models
-    "vision_feature_layer": -2,  # Which layer to extract vision features from
-    "vision_feature_select_strategy": "default",  # How to select vision features
-    # Phi-3 Vision specific settings
-    "phi3_config": {
-        "slice_mode": True,  # Enable slice mode for better performance
-        "max_slice_nums": 9,  # Maximum number of image slices
-        "use_image_id": False,  # Whether to use image IDs
-        "max_batch_size": 1,  # Batch size for inference
-        "sampling": True,  # Enable sampling
-        "stream": False  # Disable streaming for batch processing
-    },
-    # Alternative gated models (require HF authentication)
-    "gated_models": {
-        "smolvlm": "HuggingFaceTB/SmolVLM-500M-Instruct",
-        "qwen": "Qwen/Qwen3-0.6B",
-        "minicpm": "openbmb/MiniCPM-V-2_6",
-        "qwen2vl": "Qwen/Qwen2-VL-7B-Instruct",
-        "llama32": "meta-llama/Llama-3.2-11B-Vision-Instruct"
-    }
+    "repetition_penalty": 1.1
 }
 
 WHISPER_CONFIG = {
@@ -88,7 +90,7 @@ WHISPER_CONFIG = {
 # Vector database settings
 CHROMA_CONFIG = {
     "persist_directory": str(VECTOR_DB_DIR),
-    "collection_name": "secureinsight_collection",
+    "collection_name": "secureinsight_with_docs",
     "embedding_function": None,  # Will be set by EmbeddingManager
     "distance_function": "cosine",
     "hnsw_space": "cosine",
@@ -125,7 +127,7 @@ KG_CONFIG = {
 }
 
 # Search and retrieval settings
-SIMILARITY_THRESHOLD = 0.7
+SIMILARITY_THRESHOLD = 0.5
 SEARCH_CONFIG = {
     "default_k": 5,
     "max_results": 50,

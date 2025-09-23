@@ -50,6 +50,7 @@ class GeneratedResponse:
     context_used: List[Dict]
     grounding_score: float
     citations_needed: List[int]
+    model_used: str = "unknown"  # Added for compatibility with LM Studio generator
 
 
 class LLMGenerator:
@@ -60,7 +61,20 @@ class LLMGenerator:
         self.model = None
         self.tokenizer = None
         self.processor = None  # For multimodal models
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        
+        # Device configuration with better handling
+        if model_config.get('force_cpu', False):
+            self.device = torch.device('cpu')
+            logger.info("🔧 Forcing CPU-only inference for stability")
+        elif model_config.get('device') == 'cpu':
+            self.device = torch.device('cpu')
+        elif torch.cuda.is_available() and not model_config.get('force_cpu', False):
+            self.device = torch.device('cuda')
+            logger.info(f"🚀 Using GPU: {torch.cuda.get_device_name()}")
+        else:
+            self.device = torch.device('cpu')
+            logger.info("💻 Using CPU for inference")
+            
         self.is_multimodal = model_config.get('use_multimodal', False)
         
         # Configuration
@@ -532,7 +546,8 @@ class LLMGenerator:
                 processing_time=processing_time,
                 context_used=context,
                 grounding_score=grounding_score,
-                citations_needed=citations_needed
+                citations_needed=citations_needed,
+                model_used=self.model_config.get('model_name', 'huggingface-model')
             )
             
         except Exception as e:
@@ -614,7 +629,25 @@ Please answer the question based only on the information provided in the documen
                 max_length=self.max_context_length,
                 padding=True
             )
-            inputs = {k: v.to(self.device) for k, v in inputs.items()}
+            
+            # Move inputs to the same device as the model
+            # Check if model is using device_map (distributed) or single device
+            try:
+                if hasattr(self.model, 'device'):
+                    target_device = self.model.device
+                else:
+                    # Model is using device_map, get the device of the first parameter
+                    target_device = next(self.model.parameters()).device
+                
+                inputs = {k: v.to(target_device) for k, v in inputs.items()}
+            except Exception as device_error:
+                logger.warning(f"Device placement issue: {device_error}. Falling back to CPU.")
+                # Fallback to CPU if there are device issues
+                target_device = torch.device('cpu')
+                inputs = {k: v.to(target_device) for k, v in inputs.items()}
+                # Move model to CPU if needed
+                if hasattr(self.model, 'to'):
+                    self.model = self.model.to(target_device)
             
             # Generate response using the configured generation parameters
             with torch.no_grad():
@@ -630,7 +663,6 @@ Please answer the question based only on the information provided in the documen
                     no_repeat_ngram_size=self.generation_config['no_repeat_ngram_size'],
                     pad_token_id=self.generation_config['pad_token_id'],
                     eos_token_id=self.generation_config['eos_token_id'],
-                    early_stopping=True,
                     use_cache=True
                 )
             
@@ -690,7 +722,8 @@ Please answer the question based only on the information provided in the documen
                 processing_time=processing_time,
                 context_used=context,
                 grounding_score=0.8,  # Template responses are grounded by design
-                citations_needed=list(range(len(context)))
+                citations_needed=list(range(len(context))),
+                model_used="template"
             )
             
         except Exception as e:
@@ -709,7 +742,8 @@ Please answer the question based only on the information provided in the documen
             processing_time=processing_time,
             context_used=[],
             grounding_score=1.0,  # Perfectly grounded in stating limitations
-            citations_needed=[]
+            citations_needed=[],
+            model_used="none"
         )
     
     def _generate_error_response(self, query: str, start_time: float) -> GeneratedResponse:
@@ -724,7 +758,8 @@ Please answer the question based only on the information provided in the documen
             processing_time=processing_time,
             context_used=[],
             grounding_score=0.0,
-            citations_needed=[]
+            citations_needed=[],
+            model_used="error"
         )
     
     def _validate_response_grounding(self, response: str, context: List[Dict]) -> float:
@@ -783,42 +818,62 @@ Please answer the question based only on the information provided in the documen
     
     def _identify_citation_needs(self, response: str, context: List[Dict]) -> List[int]:
         """
-        Identify which context documents should be cited
-        
-        Args:
-            response: Generated response text
-            context: Source context documents
-            
-        Returns:
-            List of context document indices that should be cited
+        Identify which context documents should be cited.
+        Uses multiple fields and has a fallback to top-K by similarity.
         """
-        citations_needed = []
-        
+        citations_needed: List[int] = []
+
         try:
             response_lower = response.lower()
-            
+            response_words = set(re.findall(r'\b\w{3,}\b', response_lower))
+
+            scored_docs: List[Tuple[int, float]] = []
+
             for i, doc in enumerate(context):
-                # Check if document content appears to be referenced
-                doc_content = ""
-                if 'content_preview' in doc:
-                    doc_content = doc['content_preview'].lower()
-                elif 'content' in doc and isinstance(doc['content'], list):
-                    doc_content = ' '.join([item.get('text', '') for item in doc['content']]).lower()
-                
-                # Simple overlap check - could be made more sophisticated
-                if doc_content:
-                    doc_words = set(re.findall(r'\b\w{4,}\b', doc_content))  # Words 4+ chars
-                    response_words = set(re.findall(r'\b\w{4,}\b', response_lower))
-                    
-                    overlap = len(doc_words.intersection(response_words))
-                    if overlap >= 2:  # Threshold for citation
-                        citations_needed.append(i)
-            
+                parts: List[str] = []
+                preview = doc.get('content_preview')
+                if isinstance(preview, str):
+                    parts.append(preview)
+                content_val = doc.get('content')
+                if isinstance(content_val, list):
+                    parts.extend([item.get('text', '') for item in content_val if isinstance(item, dict)])
+                elif isinstance(content_val, str):
+                    parts.append(content_val)
+                meta = doc.get('metadata', {}) or {}
+                for k in ('title', 'subject', 'content_snippet', 'summary', 'chunk_text'):
+                    v = meta.get(k)
+                    if isinstance(v, str):
+                        parts.append(v)
+
+                doc_text = ' '.join([p for p in parts if p]).lower()
+                if not doc_text:
+                    scored_docs.append((i, float(doc.get('similarity_score', 0) or 0)))
+                    continue
+
+                doc_words = set(re.findall(r'\b\w{3,}\b', doc_text))
+                if not response_words or not doc_words:
+                    scored_docs.append((i, float(doc.get('similarity_score', 0) or 0)))
+                    continue
+
+                overlap = len(doc_words.intersection(response_words))
+                ratio = overlap / max(1, len(response_words))
+                if overlap >= 2 or ratio >= 0.02:
+                    citations_needed.append(i)
+
+                sim = float(doc.get('similarity_score', 0) or 0)
+                score = sim * 0.7 + min(1.0, overlap / 10.0) * 0.3
+                scored_docs.append((i, score))
+
+            if not citations_needed and scored_docs:
+                scored_docs.sort(key=lambda x: x[1], reverse=True)
+                top_k = min(2, len(scored_docs))
+                citations_needed = [idx for idx, sc in scored_docs[:top_k] if sc > 0]
+
             return citations_needed
-            
+
         except Exception as e:
             logger.error(f"Error identifying citation needs: {e}")
-            return list(range(min(len(context), 3)))  # Default to first 3 documents
+            return list(range(min(len(context), 2)))
     
     def generate_summary(self, documents: List[Dict], max_length: int = 300) -> str:
         """
@@ -972,7 +1027,8 @@ Please answer the question based only on the information provided in the documen
                 processing_time=processing_time,
                 context_used=context,
                 grounding_score=grounding_score,
-                citations_needed=citations_needed
+                citations_needed=citations_needed,
+                model_used=self.model_config.get('model_name', 'multimodal-model')
             )
             
         except Exception as e:

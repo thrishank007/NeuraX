@@ -22,19 +22,24 @@ openai-whisper
 librosa
 soundfile
 
-# LLM and Generation (MiniCPM-V & Qwen2VL)
-accelerate>=0.21.0
-bitsandbytes>=0.41.0
-transformers>=4.44.0
-torch>=2.0.0
-torchvision>=0.15.0
-tokenizers>=0.15.0
-safetensors>=0.3.0
-huggingface-hub>=0.17.0
-# Additional dependencies for multimodal models
-timm>=0.9.0  # For vision transformers
-einops>=0.7.0  # For tensor operations
-flash-attn>=2.0.0  # For flash attention (optional, GPU only)
+# LM Studio API (Primary LLM Interface)
+requests>=2.28.0  # For LM Studio API calls
+urllib3>=1.26.0   # HTTP library for requests
+
+# HuggingFace Models (Optional fallback when LM Studio is not available)
+# Note: These are now optional since we primarily use LM Studio
+accelerate>=0.21.0  # Optional: For HuggingFace model acceleration
+bitsandbytes>=0.41.0  # Optional: For model quantization
+transformers>=4.44.0  # Optional: For HuggingFace transformers
+torch>=2.0.0  # Optional: PyTorch for local models
+torchvision>=0.15.0  # Optional: Computer vision operations
+tokenizers>=0.15.0  # Optional: Tokenizer support
+safetensors>=0.3.0  # Optional: Safe tensor format
+huggingface-hub>=0.17.0  # Optional: HuggingFace model hub
+# Additional dependencies for multimodal models (Optional)
+timm>=0.9.0  # Optional: For vision transformers
+einops>=0.7.0  # Optional: For tensor operations
+# flash-attn>=2.0.0  # Optional: For flash attention (commented out, GPU only)
 
 # Knowledge Graph
 networkx

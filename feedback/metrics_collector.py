@@ -529,10 +529,10 @@ class MetricsCollector:
             
             # RAGAS metrics aggregation
             ragas_metrics = {}
-            for metric_name in ['context_relevancy_score', 'answer_correctness_score', 
+            for metric_name in ['context_precision_score', 'context_recall_score', 
                                'faithfulness_score', 'answer_relevancy_score']:
                 scores = [getattr(m, metric_name) for m in metrics_list 
-                         if getattr(m, metric_name) is not None]
+                         if hasattr(m, metric_name) and getattr(m, metric_name) is not None]
                 if scores:
                     ragas_metrics[metric_name] = {
                         'mean': np.mean(scores),
@@ -870,10 +870,10 @@ class MetricsCollector:
         
         ragas_analysis = {}
         
-        for metric_name in ['context_relevancy_score', 'answer_correctness_score', 
+        for metric_name in ['context_precision_score', 'context_recall_score', 
                            'faithfulness_score', 'answer_relevancy_score']:
             scores = [getattr(m, metric_name) for m in metrics_list 
-                     if getattr(m, metric_name) is not None]
+                     if hasattr(m, metric_name) and getattr(m, metric_name) is not None]
             
             if scores:
                 ragas_analysis[metric_name] = {
@@ -930,15 +930,17 @@ class MetricsCollector:
             
             # RAGAS-based recommendations
             ragas_scores = {}
-            for metric_name in ['context_relevancy_score', 'answer_correctness_score', 
+            for metric_name in ['context_precision_score', 'context_recall_score', 
                                'faithfulness_score', 'answer_relevancy_score']:
                 scores = [getattr(m, metric_name) for m in metrics_list 
-                         if getattr(m, metric_name) is not None]
+                         if hasattr(m, metric_name) and getattr(m, metric_name) is not None]
                 if scores:
                     ragas_scores[metric_name] = np.mean(scores)
             
-            if ragas_scores.get('context_relevancy_score', 1.0) < 0.7:
-                recommendations.append("Low context relevancy - review retrieval algorithm")
+            if ragas_scores.get('context_precision_score', 1.0) < 0.7:
+                recommendations.append("Low context precision - review retrieval algorithm")
+            if ragas_scores.get('context_recall_score', 1.0) < 0.7:
+                recommendations.append("Low context recall - expand retrieval scope")
             if ragas_scores.get('faithfulness_score', 1.0) < 0.7:
                 recommendations.append("Low faithfulness score - improve answer grounding")
             if ragas_scores.get('answer_relevancy_score', 1.0) < 0.7:

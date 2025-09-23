@@ -20,7 +20,7 @@ class DocumentProcessor:
     """Handles extraction of text from PDF and DOC files"""
     
     def __init__(self):
-        self.supported_formats = {'.pdf', '.docx', '.doc'}
+        self.supported_formats = {'.pdf', '.docx', '.doc', '.txt'}
         self.error_handler = ErrorHandler()
     
     def process_file(self, file_path: Path) -> Dict:
@@ -49,6 +49,8 @@ class DocumentProcessor:
                 return self._process_pdf(file_path)
             elif suffix in ['.docx', '.doc']:
                 return self._process_docx(file_path)
+            elif suffix == '.txt':
+                return self._process_txt(file_path)
             else:
                 raise ValueError(f"Unsupported file format: {suffix}")
         
@@ -110,9 +112,9 @@ class DocumentProcessor:
                 'total_pages': total_pages,
                 'processed_pages': len(text_content),
                 'metadata': {
-                    'title': doc.metadata.get('title', ''),
-                    'author': doc.metadata.get('author', ''),
-                    'subject': doc.metadata.get('subject', '')
+                    'title': doc.metadata.get('title', '') if doc.metadata else '',
+                    'author': doc.metadata.get('author', '') if doc.metadata else '',
+                    'subject': doc.metadata.get('subject', '') if doc.metadata else ''
                 }
             }
             
@@ -124,7 +126,7 @@ class DocumentProcessor:
             )
             
             # Try alternative PDF processing if available
-            if 'alternative' in error_report.recovery_action:
+            if error_report.recovery_action and 'alternative' in error_report.recovery_action:
                 logger.info("Attempting alternative PDF processing method")
                 try:
                     return self._process_pdf_alternative(file_path)
@@ -139,7 +141,7 @@ class DocumentProcessor:
     def _process_docx(self, file_path: Path) -> Dict:
         """Extract text from DOCX files"""
         try:
-            doc = Document(file_path)
+            doc = Document(str(file_path))  # Convert Path to string
             text_content = []
             
             for i, paragraph in enumerate(doc.paragraphs):
@@ -177,6 +179,76 @@ class DocumentProcessor:
             
         except Exception as e:
             logger.error(f"Error processing DOCX {file_path}: {e}")
+            raise
+    
+    def _process_txt(self, file_path: Path) -> Dict:
+        """Extract text from plain text files"""
+        try:
+            # Try different encodings to handle various text files
+            encodings = ['utf-8', 'utf-8-sig', 'latin-1', 'cp1252']
+            content = None
+            encoding_used = None
+            
+            for encoding in encodings:
+                try:
+                    with open(file_path, 'r', encoding=encoding) as file:
+                        content = file.read()
+                        encoding_used = encoding
+                        break
+                except UnicodeDecodeError:
+                    continue
+            
+            if content is None:
+                raise ValueError(f"Could not decode text file {file_path} with any supported encoding")
+            
+            # Split content into logical sections (paragraphs separated by double newlines)
+            paragraphs = content.split('\n\n')
+            text_content = []
+            
+            for i, paragraph in enumerate(paragraphs):
+                cleaned_paragraph = paragraph.strip()
+                if cleaned_paragraph:
+                    text_content.append({
+                        'paragraph': i + 1,
+                        'text': cleaned_paragraph
+                    })
+            
+            # If no double newlines, split by single newlines and group
+            if len(text_content) <= 1 and content.strip():
+                lines = content.split('\n')
+                grouped_lines = []
+                current_group = []
+                
+                for line in lines:
+                    stripped_line = line.strip()
+                    if stripped_line:
+                        current_group.append(stripped_line)
+                    else:
+                        if current_group:
+                            grouped_lines.append(' '.join(current_group))
+                            current_group = []
+                
+                if current_group:
+                    grouped_lines.append(' '.join(current_group))
+                
+                text_content = [
+                    {'paragraph': i + 1, 'text': text}
+                    for i, text in enumerate(grouped_lines)
+                ]
+            
+            return {
+                'file_path': str(file_path),
+                'file_type': 'txt',
+                'content': text_content,
+                'metadata': {
+                    'encoding': encoding_used,
+                    'file_size': file_path.stat().st_size,
+                    'line_count': len(content.split('\n'))
+                }
+            }
+            
+        except Exception as e:
+            logger.error(f"Error processing TXT {file_path}: {e}")
             raise
     
     def _process_pdf_alternative(self, file_path: Path) -> Dict:

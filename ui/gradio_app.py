@@ -8,6 +8,7 @@ from typing import List, Dict, Optional, Tuple, Any
 from loguru import logger
 import time
 import json
+import numpy as np
 from datetime import datetime
 
 # Import system components
@@ -16,7 +17,7 @@ from indexing.embedding_manager import EmbeddingManager
 from indexing.vector_store import VectorStore
 from retrieval.query_processor import QueryProcessor
 from retrieval.speech_to_text_processor import SpeechToTextProcessor
-from generation.llm_generator import LLMGenerator
+from generation.llm_factory import create_llm_generator
 from generation.citation_generator import CitationGenerator
 from feedback.feedback_system import FeedbackSystem
 from config import (
@@ -72,7 +73,11 @@ class SecureInsightGradioApp:
             
             if self.vector_store is None:
                 logger.info("Initializing vector store...")
-                self.vector_store = VectorStore()
+                from config import CHROMA_CONFIG
+                self.vector_store = VectorStore(
+                    persist_directory=CHROMA_CONFIG['persist_directory'],
+                    collection_name=CHROMA_CONFIG['collection_name']
+                )
             
             if self.query_processor is None and self.embedding_manager and self.vector_store:
                 logger.info("Initializing query processor...")
@@ -88,7 +93,13 @@ class SecureInsightGradioApp:
             
             if self.llm_generator is None:
                 logger.info("Initializing LLM generator...")
-                self.llm_generator = LLMGenerator(LLM_CONFIG)
+                self.llm_generator = create_llm_generator(LLM_CONFIG)
+                # Log model info
+                model_info = self.llm_generator.get_model_info()
+                if 'current_model' in model_info:
+                    logger.info(f"Using model: {model_info['current_model']}")
+                    if model_info.get('supports_multimodal', False):
+                        logger.info("Multimodal capabilities enabled")
             
             if self.citation_generator is None:
                 logger.info("Initializing citation generator...")
@@ -263,7 +274,10 @@ class SecureInsightGradioApp:
 
 
                                 # Store in vector database
-                                self.vector_store.add_document(result)
+                                # Format result for the new vector store format
+                                documents_to_add = [result]
+                                embeddings_to_add = np.array([result['text_embedding']])
+                                self.vector_store.add_documents(documents_to_add, embeddings_to_add)
                                 processing_log.append(f"  📊 Embeddings generated and stored")
                                 
                             except Exception as e:
@@ -780,14 +794,16 @@ class SecureInsightGradioApp:
             # Generate response using LLM
             generated_response = self.llm_generator.generate_grounded_response(
                 query=query,
-                context_documents=search_results
+                context=search_results
             )
             
             # Generate citations
+            # If the model didn't flag any specific sources, let the generator pick defaults
+            citation_indices = generated_response.citations_needed if generated_response.citations_needed else None
             citations = self.citation_generator.generate_citations(
                 response=generated_response.response_text,
                 sources=search_results,
-                citation_indices=generated_response.citations_needed
+                citation_indices=citation_indices
             )
             
             processing_time = time.time() - start_time
@@ -1129,7 +1145,7 @@ class SecureInsightGradioApp:
                                 label="Similarity Threshold",
                                 minimum=0.0,
                                 maximum=1.0,
-                                value=0.7,
+                                value=0.5,
                                 step=0.05,
                                 info="Higher values = more strict matching"
                             )
@@ -1207,7 +1223,7 @@ class SecureInsightGradioApp:
                                 label="Context Similarity Threshold",
                                 minimum=0.0,
                                 maximum=1.0,
-                                value=0.7,
+                                value=0.5,
                                 step=0.05,
                                 info="Higher values = more relevant context"
                             )

@@ -109,7 +109,7 @@ class CitationGenerator:
             # Get source content
             source_content = ""
             
-            if 'content_preview' in source:
+            if 'content_preview' in source and source['content_preview']:
                 source_content = source['content_preview']
             elif 'content' in source:
                 if isinstance(source['content'], list):
@@ -119,8 +119,14 @@ class CitationGenerator:
                         if isinstance(item, dict) and 'text' in item:
                             content_parts.append(item['text'])
                     source_content = ' '.join(content_parts)
-                else:
-                    source_content = str(source['content'])
+                elif isinstance(source['content'], str):
+                    source_content = source['content']
+            # Try metadata snippet as a fallback
+            if not source_content:
+                meta = source.get('metadata', {}) or {}
+                meta_snippet = meta.get('content_snippet') or meta.get('summary') or meta.get('title')
+                if isinstance(meta_snippet, str):
+                    source_content = meta_snippet
             
             if not source_content:
                 return "Content not available"

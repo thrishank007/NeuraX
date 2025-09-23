@@ -343,16 +343,16 @@ class FeedbackSystem:
         Returns:
             List of recent feedback entries
         """
+        from datetime import timedelta
         cutoff_date = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
-        cutoff_date = cutoff_date.replace(day=cutoff_date.day - days)
+        cutoff_date = cutoff_date - timedelta(days=days)
         
         recent_feedback = []
         for feedback in self._read_all_feedback():
             if feedback.timestamp >= cutoff_date:
                 recent_feedback.append(feedback)
         
-        return sorted(recent_feedback, key=lambda x: x.timestamp, reverse=True)
-    
+        return sorted(recent_feedback, key=lambda x: x.timestamp, reverse=True)    
     def flag_for_anomaly_detection(self, feedback_data: FeedbackData) -> Dict[str, Any]:
         """
         Flag feedback for anomaly detection if it meets certain criteria.

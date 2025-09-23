@@ -262,6 +262,7 @@ class QueryProcessor:
                 'embedding_type': metadata.get('embedding_type', 'unknown'),
                 'metadata': metadata,
                 'timestamp': metadata.get('timestamp', ''),
+                'content': result.get('document', ''),  # Include actual document content
                 'content_preview': self._generate_content_preview(metadata)
             }
             

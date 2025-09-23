@@ -105,15 +105,23 @@ class IngestionManager:
         try:
             logger.info(f"Processing {file_type} file: {file_path}")
             
+            result = None
             if file_type == 'document':
-                return self.document_processor.process_file(file_path)
+                result = self.document_processor.process_file(file_path)
             elif file_type == 'image':
-                return self.image_processor.process_image(file_path)
+                result = self.image_processor.process_image(file_path)
             elif file_type == 'audio':
-                return self.audio_processor.process_audio(file_path)
+                result = self.audio_processor.process_audio(file_path)
             else:
                 logger.warning(f"Unsupported file type: {file_type} for {file_path}")
                 return None
+            
+            # Add processed_type field to fix the "Unknown" status issue
+            if result:
+                result['processed_type'] = self._get_processed_type(result)
+                logger.info(f"Successfully processed {result['processed_type']} file: {file_path}")
+            
+            return result
                 
         except Exception as e:
             logger.error(f"Failed to process file {file_path}: {e}")
@@ -286,6 +294,31 @@ class IngestionManager:
                 stats['total_size'] += doc['metadata']['file_size']
         
         return stats
+    
+    def _get_processed_type(self, processed_result: Dict) -> str:
+        """Determine the processed type based on the processing result"""
+        file_type = processed_result.get('file_type', 'unknown')
+        
+        # Map file types to display-friendly processed types
+        type_mapping = {
+            'pdf': 'Document',
+            'docx': 'Document', 
+            'doc': 'Document',
+            'txt': 'Text',
+            'jpg': 'Image',
+            'jpeg': 'Image',
+            'png': 'Image',
+            'bmp': 'Image',
+            'tiff': 'Image',
+            'webp': 'Image',
+            'wav': 'Audio',
+            'mp3': 'Audio',
+            'm4a': 'Audio',
+            'flac': 'Audio',
+            'ogg': 'Audio'
+        }
+        
+        return type_mapping.get(file_type, 'Unknown')
     
     def validate_file_before_processing(self, file_path: Path) -> bool:
         """

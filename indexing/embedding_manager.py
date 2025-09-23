@@ -164,6 +164,37 @@ class EmbeddingManager:
             return embedding
         return embedding / norm
     
+    def _standardize_embedding_dimension(self, embedding: np.ndarray, target_dim: int = 384) -> np.ndarray:
+        """
+        Standardize embedding dimension to ensure compatibility across different models
+        
+        Args:
+            embedding: Input embedding array
+            target_dim: Target dimension (default 384 for text model compatibility)
+            
+        Returns:
+            Standardized embedding with target dimension
+        """
+        current_dim = embedding.shape[0] if embedding.ndim == 1 else embedding.shape[-1]
+        
+        if current_dim == target_dim:
+            return embedding
+        elif current_dim > target_dim:
+            # Truncate to target dimension
+            logger.warning(f"Truncating embedding from {current_dim} to {target_dim} dimensions")
+            return embedding[:target_dim] if embedding.ndim == 1 else embedding[..., :target_dim]
+        else:
+            # Pad with zeros to reach target dimension
+            logger.warning(f"Padding embedding from {current_dim} to {target_dim} dimensions")
+            if embedding.ndim == 1:
+                padding = np.zeros(target_dim - current_dim)
+                return np.concatenate([embedding, padding])
+            else:
+                padding_shape = list(embedding.shape)
+                padding_shape[-1] = target_dim - current_dim
+                padding = np.zeros(padding_shape)
+                return np.concatenate([embedding, padding], axis=-1)
+    
     def embed_text(self, texts: Union[str, List[str]], normalize: bool = True, 
                    use_cache: bool = True) -> np.ndarray:
         """
@@ -219,9 +250,17 @@ class EmbeddingManager:
                 
                 new_embeddings = self.text_model.encode(uncached_texts, convert_to_numpy=True)
                 
-                # Normalize if requested
+                # Standardize dimensions and normalize if requested
                 if normalize:
-                    new_embeddings = np.array([self._normalize_embedding(emb) for emb in new_embeddings])
+                    new_embeddings = np.array([
+                        self._normalize_embedding(self._standardize_embedding_dimension(emb)) 
+                        for emb in new_embeddings
+                    ])
+                else:
+                    new_embeddings = np.array([
+                        self._standardize_embedding_dimension(emb) 
+                        for emb in new_embeddings
+                    ])
                 
                 # Update cache and results
                 for i, (text, embedding) in enumerate(zip(uncached_texts, new_embeddings)):
@@ -300,9 +339,17 @@ class EmbeddingManager:
                     image_features = self.clip_model.get_image_features(**inputs)
                     new_embeddings = image_features.cpu().numpy()
                 
-                # Normalize if requested
+                # Standardize dimensions and normalize if requested
                 if normalize:
-                    new_embeddings = np.array([self._normalize_embedding(emb) for emb in new_embeddings])
+                    new_embeddings = np.array([
+                        self._normalize_embedding(self._standardize_embedding_dimension(emb)) 
+                        for emb in new_embeddings
+                    ])
+                else:
+                    new_embeddings = np.array([
+                        self._standardize_embedding_dimension(emb) 
+                        for emb in new_embeddings
+                    ])
                 
                 # Update cache and results
                 for i, ((pil_img, img_path), embedding) in enumerate(zip(uncached_images, new_embeddings)):
@@ -352,10 +399,14 @@ class EmbeddingManager:
                 text_embeds = outputs.text_embeds.cpu().numpy()
                 image_embeds = outputs.image_embeds.cpu().numpy()
             
+            # Standardize dimensions for compatibility
+            text_embeds_std = self._standardize_embedding_dimension(text_embeds[0])
+            image_embeds_std = self._standardize_embedding_dimension(image_embeds[0])
+            
             return {
-                'text_embedding': text_embeds[0],
-                'image_embedding': image_embeds[0],
-                'combined_embedding': np.concatenate([text_embeds[0], image_embeds[0]])
+                'text_embedding': text_embeds_std,
+                'image_embedding': image_embeds_std,
+                'combined_embedding': np.concatenate([text_embeds_std, image_embeds_std])
             }
             
         except Exception as e:

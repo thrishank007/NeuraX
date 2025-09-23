@@ -298,12 +298,20 @@ class SecureInsightLauncher:
             return True
     
     def _initialize_llm_generator(self) -> bool:
-        """Initialize LLM generator"""
+        """Initialize LLM generator (using LM Studio by default, fallback to HuggingFace)"""
         try:
-            from generation.llm_generator import LLMGenerator
-            self.llm_generator = LLMGenerator(LLM_CONFIG)
+            from generation.llm_factory import create_llm_generator
+            self.llm_generator = create_llm_generator(LLM_CONFIG)
             self.component_status['llm_generator'] = True
-            self.logger.info("✅ LLM generator initialized")
+            
+            # Get model info for logging
+            model_info = self.llm_generator.get_model_info()
+            if 'current_model' in model_info:
+                self.logger.info(f"✅ LLM generator initialized with model: {model_info['current_model']}")
+                if model_info.get('supports_multimodal', False):
+                    self.logger.info("🖼️  Multimodal capabilities enabled")
+            else:
+                self.logger.info("✅ LLM generator initialized")
             return True
         except Exception as e:
             self.logger.error(f"❌ Failed to initialize LLM generator: {e}")
