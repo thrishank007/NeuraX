@@ -52,8 +52,8 @@ class QueryProcessor:
         logger.info("Query processor initialized")
     
     def process_text_query(self, query: str, filters: Optional[Dict] = None,
-                          k: int = None) -> QueryResult:     
-   """
+                          k: int = None) -> QueryResult:
+        """
         Process a text query and return relevant results
         
         Args:

@@ -1,2 +1,5 @@
 *.md
 .kiro
+venv
+tests
+test_*.py

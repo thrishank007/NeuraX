@@ -1,0 +1,42 @@
+{
+  "document_search_simple": {
+    "manual_time": 30.0,
+    "description": "Simple keyword search in documents"
+  },
+  "document_search_medium": {
+    "manual_time": 120.0,
+    "description": "Complex search across multiple documents"
+  },
+  "document_search_complex": {
+    "manual_time": 300.0,
+    "description": "Research-level document analysis"
+  },
+  "multimodal_query_simple": {
+    "manual_time": 60.0,
+    "description": "Basic image-text search"
+  },
+  "multimodal_query_medium": {
+    "manual_time": 180.0,
+    "description": "Cross-modal analysis"
+  },
+  "multimodal_query_complex": {
+    "manual_time": 600.0,
+    "description": "Complex multimodal reasoning"
+  },
+  "audio_transcription_simple": {
+    "manual_time": 300.0,
+    "description": "Manual audio transcription"
+  },
+  "audio_transcription_medium": {
+    "manual_time": 900.0,
+    "description": "Complex audio analysis"
+  },
+  "knowledge_extraction_simple": {
+    "manual_time": 600.0,
+    "description": "Basic information extraction"
+  },
+  "knowledge_extraction_medium": {
+    "manual_time": 1800.0,
+    "description": "Comprehensive knowledge mapping"
+  }
+}

@@ -1,9 +1,9 @@
 # Core RAG Framework
-raganything[all]
+# raganything[all]  # Commented out due to dependency conflicts
 
 # Multimodal Embeddings
 sentence-transformers
-clip-by-openai
+# clip-by-openai  # Replaced with transformers CLIP
 transformers
 torch
 torchvision
@@ -22,9 +22,19 @@ openai-whisper
 librosa
 soundfile
 
-# LLM and Generation
-accelerate
-bitsandbytes
+# LLM and Generation (MiniCPM-V & Qwen2VL)
+accelerate>=0.21.0
+bitsandbytes>=0.41.0
+transformers>=4.44.0
+torch>=2.0.0
+torchvision>=0.15.0
+tokenizers>=0.15.0
+safetensors>=0.3.0
+huggingface-hub>=0.17.0
+# Additional dependencies for multimodal models
+timm>=0.9.0  # For vision transformers
+einops>=0.7.0  # For tensor operations
+flash-attn>=2.0.0  # For flash attention (optional, GPU only)
 
 # Knowledge Graph
 networkx
