@@ -937,553 +937,246 @@ class SecureInsightGradioApp:
             return f"❌ Error getting system info: {e}"
     
     def create_interface(self) -> gr.Blocks:
-        """Create the main Gradio interface"""
-        
-        with gr.Blocks(
-            title="SecureInsight - Multimodal RAG System",
-            theme=gr.themes.Soft(),
-            css="""
-            .gradio-container {
-                max-width: 1400px !important;
-            }
-            .file-upload-area {
-                border: 2px dashed #ccc;
-                border-radius: 10px;
-                padding: 20px;
-                text-align: center;
-                background-color: #f9f9f9;
-            }
-            .query-section {
-                border: 1px solid #ddd;
-                border-radius: 8px;
-                padding: 15px;
-                margin: 10px 0;
-                background-color: #f8f9fa;
-            }
-            .status-box {
-                padding: 10px;
-                border-radius: 5px;
-                margin: 10px 0;
-            }
-            .success { background-color: #d4edda; border: 1px solid #c3e6cb; }
-            .error { background-color: #f8d7da; border: 1px solid #f5c6cb; }
-            .warning { background-color: #fff3cd; border: 1px solid #ffeaa7; }
-            .results-container {
-                max-height: 600px;
-                overflow-y: auto;
-            }
-            """
-        ) as interface:
-            
-            # Header
-            gr.Markdown(
-                """
-                # 🔒 SecureInsight - Multimodal RAG System
-                
-                Upload and process documents, images, and audio files for secure offline analysis.
-                Supports PDFs, DOCs, images (JPG, PNG, etc.), and audio files (WAV, MP3, etc.).
-                """
-            )
-            
-            # Create tabs for different functionalities
-            with gr.Tabs():
-                # File Upload Tab
-                with gr.TabItem("📤 File Upload", id="upload_tab"):
-                    with gr.Row():
-                        with gr.Column(scale=2):
-                            # File upload section
-                            gr.Markdown("## 📤 File Upload & Processing")
-                            
-                            file_upload = gr.File(
-                                label="Upload Files",
-                                file_count="multiple",
-                                file_types=self.supported_formats,
-                                elem_classes=["file-upload-area"]
-                            )
-                            
-                            with gr.Row():
-                                process_btn = gr.Button(
-                                    "🚀 Process Files", 
-                                    variant="primary",
-                                    size="lg"
-                                )
-                                clear_btn = gr.Button(
-                                    "🗑️ Clear", 
-                                    variant="secondary"
-                                )
-                            
-                            # Processing status
-                            status_display = gr.Textbox(
-                                label="📊 Processing Status",
-                                value="🔄 Ready for new files",
-                                interactive=False,
-                                lines=2
-                            )
-                        
-                        with gr.Column(scale=1):
-                            # System information
-                            gr.Markdown("## ℹ️ System Info")
-                            system_info = gr.Markdown(
-                                value=self.get_system_info()
-                            )
-                            
-                            refresh_info_btn = gr.Button(
-                                "🔄 Refresh Info",
-                                size="sm"
-                            )
-                    
-                    # Processing log and results
-                    with gr.Row():
-                        with gr.Column():
-                            processing_log = gr.Textbox(
-                                label="📋 Processing Log",
-                                lines=10,
-                                interactive=False,
-                                placeholder="Processing details will appear here..."
-                            )
-                        
-                        with gr.Column():
-                            processed_files_display = gr.HTML(
-                                label="📁 Processed Files",
-                                value="<p>No files processed yet.</p>"
-                            )
-                
-                # Query Interface Tab
-                with gr.TabItem("🔍 Search & Query", id="query_tab"):
-                    gr.Markdown("## 🔍 Multimodal Search Interface")
-                    gr.Markdown("Search through your processed documents using text, images, or voice queries.")
-                    
-                    # Query controls
-                    with gr.Row():
-                        with gr.Column(scale=3):
-                            # Text Query Section
-                            with gr.Group(elem_classes=["query-section"]):
-                                gr.Markdown("### 💬 Text Query")
-                                text_query_input = gr.Textbox(
-                                    label="Enter your search query",
-                                    placeholder="e.g., 'security protocols', 'network configuration', 'user authentication'...",
-                                    lines=2
-                                )
-                                
-                                with gr.Row():
-                                    text_search_btn = gr.Button(
-                                        "🔍 Search Text", 
-                                        variant="primary"
-                                    )
-                                    clear_text_btn = gr.Button(
-                                        "🗑️ Clear", 
-                                        variant="secondary",
-                                        size="sm"
-                                    )
-                            
-                            # Image Query Section
-                            with gr.Group(elem_classes=["query-section"]):
-                                gr.Markdown("### 🖼️ Image Query")
-                                image_query_input = gr.File(
-                                    label="Upload an image to search for similar content",
-                                    file_types=['.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.gif']
-                                )
-                                
-                                image_search_btn = gr.Button(
-                                    "🔍 Search by Image", 
-                                    variant="primary"
-                                )
-                            
-                            # Voice Query Section
-                            with gr.Group(elem_classes=["query-section"]):
-                                gr.Markdown("### 🎤 Voice Query")
-                                voice_query_input = gr.File(
-                                    label="Upload an audio file with your spoken query",
-                                    file_types=['.wav', '.mp3', '.m4a', '.flac', '.ogg']
-                                )
-                                
-                                with gr.Row():
-                                    voice_search_btn = gr.Button(
-                                        "🔍 Search by Voice", 
-                                        variant="primary"
-                                    )
-                                    # Placeholder for future microphone input
-                                    # mic_btn = gr.Button(
-                                    #     "🎙️ Record", 
-                                    #     variant="secondary",
-                                    #     size="sm"
-                                    # )
-                                
-                                voice_transcription = gr.Textbox(
-                                    label="Voice Transcription",
-                                    placeholder="Transcribed text will appear here...",
-                                    interactive=False,
-                                    lines=2
-                                )
-                            
-                            # Multimodal Query Section
-                            with gr.Group(elem_classes=["query-section"]):
-                                gr.Markdown("### 🔀 Multimodal Query")
-                                gr.Markdown("Combine text and image for more precise search results.")
-                                
-                                multimodal_text = gr.Textbox(
-                                    label="Text component",
-                                    placeholder="Describe what you're looking for...",
-                                    lines=1
-                                )
-                                
-                                multimodal_image = gr.File(
-                                    label="Image component",
-                                    file_types=['.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.gif']
-                                )
-                                
-                                multimodal_search_btn = gr.Button(
-                                    "🔍 Multimodal Search", 
-                                    variant="primary"
-                                )
-                        
-                        with gr.Column(scale=1):
-                            # Search Settings
-                            gr.Markdown("### ⚙️ Search Settings")
-                            
-                            similarity_threshold = gr.Slider(
-                                label="Similarity Threshold",
-                                minimum=0.0,
-                                maximum=1.0,
-                                value=0.5,
-                                step=0.05,
-                                info="Higher values = more strict matching"
-                            )
-                            
-                            # Query Status
-                            query_status = gr.Textbox(
-                                label="🔍 Query Status",
-                                value="🔄 Ready for queries",
-                                interactive=False,
-                                lines=2
-                            )
-                            
-                            # Clear All Results
-                            clear_all_btn = gr.Button(
-                                "🗑️ Clear All Results",
-                                variant="secondary",
-                                size="sm"
-                            )
-                            
-                            # Query History
-                            with gr.Accordion("📋 Query History", open=False):
-                                query_history_display = gr.HTML(
-                                    value="<p>No queries yet.</p>"
-                                )
-                    
-                    # Search Results
-                    with gr.Row():
-                        search_results_display = gr.HTML(
-                            label="🔍 Search Results",
-                            value="<p>No search results yet. Enter a query above to get started.</p>",
-                            elem_classes=["results-container"]
+        """
+        Modern & Attractive SecureInsight Interface
+        """
+
+        css = r"""
+        .gradio-container { 
+            max-width: 1800px !important; 
+            margin: 0 auto; 
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial; 
+            background: #393C3C !important; 
+        }
+
+        /* Sidebar */
+        .sidebar { 
+            background: #C3C7C7; 
+            padding: 16px; 
+            border-right: 1px solid #e0e0e0; 
+            height: 100%; 
+            border-radius: 12px; 
+            box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+        }
+        .chat-list-item { 
+            padding: 12px 16px; 
+            margin-bottom: 8px; 
+            border-radius: 10px; 
+            cursor: pointer; 
+            background: #7C8383; 
+            font-weight: 500;
+            transition: all 0.2s ease-in-out;
+        }
+        .chat-list-item:hover { 
+            background: #000000; 
+            color: #ffffff; 
+            transform: scale(1.02);
+        }
+
+        /* Header Bar */
+        .header-bar { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            padding: 10px 16px; 
+            margin-bottom: 12px; 
+            border-bottom: 2px solid #e0e0e0; 
+        }
+        .header-title { 
+            font-weight: 700; 
+            font-size: 22px; 
+            color: #111827; 
+        }
+        .header-bar button { 
+            background:#2563eb; 
+            color: white; 
+            border:none; 
+            border-radius:6px; 
+            padding:6px 14px; 
+            font-size:14px; 
+            cursor:pointer; 
+            transition: background 0.2s ease-in-out;
+        }
+        .header-bar button:hover { background:#1e40af; }
+
+        /* Main Chat Panel */
+        .main-chat { 
+            background: #ffffff; 
+            border-radius: 14px; 
+            padding: 18px; 
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08); 
+            min-height: 650px; 
+        }
+        .chatbox { 
+            border: 1px solid #d1d5db; 
+            border-radius: 10px; 
+            padding: 10px;
+        }
+
+        /* Right Panel */
+        .right-panel { 
+            background: #ffffff; 
+            padding: 18px; 
+            border-radius: 14px; 
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08); 
+            min-height: 100%; 
+        }
+        .right-panel h3, .right-panel label { 
+            color: #111827 !important; 
+        }
+
+        /* Inputs */
+        input, textarea, select, .gr-textbox, .gr-text-input {
+            background: #f9fafb !important; 
+            color: #111827 !important; 
+            border: 1px solid #d1d5db !important; 
+            border-radius: 8px !important; 
+            padding: 8px;
+        }
+
+        /* Buttons */
+        button { 
+            font-weight: 600; 
+            border-radius: 8px !important; 
+            transition: all 0.2s ease-in-out;
+        }
+        button:hover { transform: scale(1.02); }
+
+        /* Tabs */
+        .tab-nav button { 
+            font-weight: 600; 
+            padding: 8px 14px; 
+            color: #F1A151;
+        }
+
+        /* Force all Gradio component labels to be visible */
+        label, .block-label, .wrap label, .form label {
+            color: #000000 !important;  /* black text */
+            font-weight: 600;
+        }
+
+        """
+
+        with gr.Blocks(css=css) as interface:
+            with gr.Row():
+                # -------------------------
+                # LEFT: Sidebar Chat List
+                # -------------------------
+                with gr.Column(scale=2, min_width=240, elem_classes="sidebar"):
+                    gr.Markdown("### 💬 Chats")
+                    gr.HTML(
+                        "<div class='chat-list-item'>Unnamed Chat</div>"
+                        "<div class='chat-list-item'>Project Notes</div>"
+                        "<div class='chat-list-item'>Research Draft</div>"
+                    )
+
+                # -------------------------
+                # CENTER: Main Workspace
+                # -------------------------
+                with gr.Column(scale=6, min_width=800):
+                    with gr.Column(elem_classes="main-chat"):
+                        gr.HTML(
+                            "<div class='header-bar'>"
+                            "<span class='header-title'>🔒 SecureInsight - Multimodal RAG System</span>"
+                            "<button>Eject</button>"
+                            "</div>"
                         )
-                
-                # Response Generation Tab
-                with gr.TabItem("💬 AI Response", id="response_tab"):
-                    gr.Markdown("## 💬 AI Response Generation with Citations")
-                    gr.Markdown("Generate AI responses based on your search results with full source citations.")
-                    
-                    with gr.Row():
-                        with gr.Column(scale=2):
-                            # Response Generation Section
-                            with gr.Group(elem_classes=["query-section"]):
-                                gr.Markdown("### 🤖 Generate Response")
-                                
-                                response_query_input = gr.Textbox(
-                                    label="Enter your question",
-                                    placeholder="Ask a question about your documents...",
-                                    lines=2
+
+                        with gr.Tabs():
+                            # -------- File Upload --------
+                            with gr.TabItem("📤 File Upload"):
+                                file_upload = gr.File(
+                                    label="Upload Files",
+                                    file_count="multiple",
+                                    file_types=self.supported_formats,
                                 )
-                                
-                                with gr.Row():
-                                    generate_response_btn = gr.Button(
-                                        "🤖 Generate Response", 
-                                        variant="primary",
-                                        size="lg"
-                                    )
-                                    clear_response_btn = gr.Button(
-                                        "🗑️ Clear", 
-                                        variant="secondary"
-                                    )
-                                
-                                # Response Status
-                                response_status = gr.Textbox(
-                                    label="🤖 Generation Status",
-                                    value="🔄 Ready to generate responses",
-                                    interactive=False,
-                                    lines=2
-                                )
-                        
-                        with gr.Column(scale=1):
-                            # Response Settings
-                            gr.Markdown("### ⚙️ Response Settings")
-                            
-                            response_similarity_threshold = gr.Slider(
-                                label="Context Similarity Threshold",
-                                minimum=0.0,
-                                maximum=1.0,
-                                value=0.5,
-                                step=0.05,
-                                info="Higher values = more relevant context"
-                            )
-                            
-                            max_context_docs = gr.Slider(
-                                label="Maximum Context Documents",
-                                minimum=1,
-                                maximum=10,
-                                value=5,
-                                step=1,
-                                info="Number of documents to use as context"
-                            )
-                    
-                    # Generated Response Display
-                    with gr.Row():
-                        with gr.Column():
-                            generated_response_display = gr.Textbox(
-                                label="🤖 Generated Response",
-                                placeholder="Generated response will appear here...",
-                                lines=8,
-                                interactive=False
-                            )
-                            
-                            # Response Metadata
-                            with gr.Row():
-                                response_confidence = gr.Textbox(
-                                    label="Confidence Score",
-                                    placeholder="N/A",
-                                    interactive=False,
-                                    scale=1
-                                )
-                                response_time = gr.Textbox(
-                                    label="Processing Time",
-                                    placeholder="N/A",
-                                    interactive=False,
-                                    scale=1
-                                )
-                        
-                        with gr.Column():
-                            citations_display = gr.HTML(
-                                label="📚 Citations & Sources",
-                                value="<p>No citations yet. Generate a response to see sources.</p>",
-                                elem_classes=["results-container"]
-                            )
-                    
-                    # Feedback Section
-                    with gr.Group(elem_classes=["query-section"]):
-                        gr.Markdown("### 📝 Feedback")
-                        gr.Markdown("Help us improve by rating the response quality.")
-                        
-                        with gr.Row():
-                            feedback_rating = gr.Slider(
-                                label="Rating (1-5 stars)",
-                                minimum=1,
-                                maximum=5,
-                                value=3,
-                                step=1
-                            )
-                            
-                            feedback_comments = gr.Textbox(
-                                label="Comments (optional)",
-                                placeholder="Any additional feedback...",
-                                lines=2,
-                                scale=2
-                            )
-                        
-                        with gr.Row():
-                            submit_feedback_btn = gr.Button(
-                                "📝 Submit Feedback",
-                                variant="secondary"
-                            )
-                            
-                            feedback_status = gr.Textbox(
-                                label="Feedback Status",
-                                placeholder="Ready to receive feedback",
-                                interactive=False,
-                                scale=2
-                            )
-            
-            # Help section
-            with gr.Accordion("❓ Help & Instructions", open=False):
-                gr.Markdown(
-                    f"""
-                    ### How to Use
-                    
-                    #### File Upload & Processing
-                    1. **Upload Files**: Click the upload area or drag and drop files
-                    2. **Supported Formats**: {', '.join(self.supported_formats)}
-                    3. **File Size Limit**: {SECURITY_CONFIG['max_upload_size_mb']} MB per file
-                    4. **Processing**: Click "Process Files" to start ingestion
-                    5. **Monitor**: Watch the processing log for real-time updates
-                    
-                    #### Search & Query
-                    1. **Text Search**: Enter natural language queries to find relevant documents
-                    2. **Image Search**: Upload an image to find visually similar content
-                    3. **Voice Search**: Upload audio files with spoken queries (uses speech-to-text)
-                    4. **Multimodal Search**: Combine text and image for more precise results
-                    5. **Adjust Threshold**: Use the similarity slider to control result strictness
-                    
-                    ### File Types
-                    
-                    - **📄 Documents**: PDF, DOCX, DOC, TXT - Text extraction and indexing
-                    - **🖼️ Images**: JPG, PNG, BMP, TIFF - OCR text extraction
-                    - **🎵 Audio**: WAV, MP3, M4A, FLAC - Speech-to-text transcription
-                    
-                    ### Search Features
-                    
-                    - **Cross-modal search**: Text queries can find images and vice versa
-                    - **Similarity scoring**: All results include confidence scores
-                    - **Content preview**: See snippets of matching content
-                    - **Source traceability**: Direct links to original files
-                    
-                    ### Security Features
-                    
-                    - All processing happens offline
-                    - Files are validated before processing
-                    - No data leaves your system
-                    - Comprehensive error handling
-                    
-                    ### Troubleshooting
-                    
-                    - **File not supported**: Check the supported formats list
-                    - **File too large**: Reduce file size or split into smaller files
-                    - **Processing failed**: Check the processing log for details
-                    - **No search results**: Try lowering the similarity threshold
-                    - **Voice unclear**: Upload clearer audio or type your query instead
-                    - **System slow**: Try processing fewer files at once
-                    """
-                )
-            
-            # Event handlers for file upload tab
+                                process_btn = gr.Button("🚀 Process Files", variant="primary")
+                                clear_btn = gr.Button("🗑️ Clear", variant="secondary")
+                                status_display = gr.Textbox(label="📊 Processing Status", value="🔄 Ready", interactive=False)
+                                processing_log = gr.Textbox(label="📋 Processing Log", lines=8, interactive=False)
+                                processed_files_display = gr.HTML("<p>No files processed yet.</p>")
+
+                            # -------- Query --------
+                            with gr.TabItem("🔍 Search & Query"):
+                                text_query_input = gr.Textbox(label="Enter Query")
+                                text_search_btn = gr.Button("🔍 Search Text", variant="primary")
+                                search_results_display = gr.HTML("<p>No results yet.</p>")
+
+                            # -------- AI Response --------
+                            with gr.TabItem("💬 AI Response"):
+                                response_query_input = gr.Textbox(label="Enter your question")
+                                generate_response_btn = gr.Button("🤖 Generate Response", variant="primary")
+                                generated_response_display = gr.Textbox(label="Response", interactive=False, lines=8)
+                                citations_display = gr.HTML("<p>No citations yet.</p>")
+
+                            # -------- Feedback --------
+                            with gr.TabItem("📝 Feedback"):
+                                feedback_rating = gr.Slider(label="Rating (1-5)", minimum=1, maximum=5, value=3, step=1)
+                                feedback_comments = gr.Textbox(label="Comments", lines=2)
+                                submit_feedback_btn = gr.Button("Submit Feedback", variant="secondary")
+                                feedback_status = gr.Textbox(label="Feedback Status", value="Ready", interactive=False)
+
+                            # -------- Help --------
+                            with gr.TabItem("❓ Help & Instructions"):
+                                gr.Markdown("## Instructions\n- Upload files\n- Run queries\n- Generate responses\n- Provide feedback")
+
+                # -------------------------
+                # RIGHT: Configuration Panel
+                # -------------------------
+                with gr.Column(scale=3, min_width=280, elem_classes="right-panel"):
+                    gr.Markdown("### ⚙️ Advanced Configuration")
+
+                    system_prompt = gr.Textbox(
+                        label="System Prompt",
+                        placeholder='Example: "Only answer in rhymes"',
+                        lines=3
+                    )
+
+                    with gr.Accordion("General", open=False):
+                        gr.Checkbox(label="Enable feature X")
+                        gr.Checkbox(label="Enable feature Y")
+
+                    with gr.Accordion("Sampling", open=False):
+                        gr.Slider(label="Temperature", minimum=0, maximum=2, step=0.1, value=1.0)
+                        gr.Slider(label="Top-p", minimum=0, maximum=1, step=0.05, value=0.95)
+
+            # -------------------------
+            # Event handlers
+            # -------------------------
             process_btn.click(
                 fn=self.process_uploaded_files,
                 inputs=[file_upload],
                 outputs=[status_display, processing_log, processed_files_display],
                 show_progress=True
             )
-            
+
             clear_btn.click(
                 fn=self.clear_processing_state,
                 outputs=[status_display, processing_log, processed_files_display]
             )
-            
-            refresh_info_btn.click(
-                fn=self.get_system_info,
-                outputs=[system_info]
-            )
-            
-            # Event handlers for query tab
-            
-            # Text search
+
             text_search_btn.click(
                 fn=self.process_text_query,
-                inputs=[text_query_input, similarity_threshold],
-                outputs=[query_status, search_results_display],
+                inputs=[text_query_input],
+                outputs=[search_results_display],
                 show_progress=True
             )
-            
-            # Clear text query
-            clear_text_btn.click(
-                fn=lambda: "",
-                outputs=[text_query_input]
-            )
-            
-            # Image search
-            image_search_btn.click(
-                fn=self.process_image_query,
-                inputs=[image_query_input, similarity_threshold],
-                outputs=[query_status, search_results_display],
-                show_progress=True
-            )
-            
-            # Voice search
-            voice_search_btn.click(
-                fn=self.process_voice_query,
-                inputs=[voice_query_input, similarity_threshold],
-                outputs=[query_status, voice_transcription, search_results_display],
-                show_progress=True
-            )
-            
-            # Multimodal search
-            multimodal_search_btn.click(
-                fn=self.process_multimodal_query,
-                inputs=[multimodal_text, multimodal_image, similarity_threshold],
-                outputs=[query_status, search_results_display],
-                show_progress=True
-            )
-            
-            # Clear all results
-            clear_all_btn.click(
-                fn=self.clear_query_results,
-                outputs=[query_status, text_query_input, voice_transcription, search_results_display]
-            )
-            
-            # Update query history when any search is performed
-            def update_history():
-                return self.get_query_history_html()
-            
-            # Connect history updates to search buttons
-            for btn in [text_search_btn, image_search_btn, voice_search_btn, multimodal_search_btn]:
-                btn.click(
-                    fn=update_history,
-                    outputs=[query_history_display],
-                    show_progress=False
-                )
-            
-            # Event handlers for response generation tab
-            
-            # Generate response with citations
-            def generate_response_handler(query_text, similarity_threshold, max_docs):
-                if not query_text or not query_text.strip():
-                    return "❌ Please enter a question", "", "", "", ""
-                
-                # First, search for relevant documents
-                search_status, search_html = self.process_text_query(query_text, similarity_threshold)
-                
-                if "No results found" in search_status:
-                    return "ℹ️ No relevant documents found for context", "", "", "", ""
-                
-                # Get search results from the last query
-                search_results = self.query_state.get('last_results', [])[:max_docs]
-                
-                # Generate response with citations
-                response_text, citations_html, confidence, proc_time = self.generate_response_with_citations(
-                    query_text, search_results
-                )
-                
-                status = f"✅ Response generated in {proc_time:.2f}s"
-                confidence_display = f"{confidence:.2f}" if confidence > 0 else "N/A"
-                time_display = f"{proc_time:.2f}s" if proc_time > 0 else "N/A"
-                
-                return status, response_text, citations_html, confidence_display, time_display
-            
+
             generate_response_btn.click(
-                fn=generate_response_handler,
-                inputs=[response_query_input, response_similarity_threshold, max_context_docs],
-                outputs=[response_status, generated_response_display, citations_display, response_confidence, response_time],
+                fn=self.generate_response_with_citations,
+                inputs=[response_query_input],
+                outputs=[generated_response_display, citations_display],
                 show_progress=True
             )
-            
-            # Clear response
-            clear_response_btn.click(
-                fn=lambda: ("🔄 Ready to generate responses", "", "<p>No citations yet. Generate a response to see sources.</p>", "", ""),
-                outputs=[response_status, generated_response_display, citations_display, response_confidence, response_time]
-            )
-            
-            # Submit feedback
-            def submit_feedback_handler(query, response, rating, comments):
-                if not query or not response:
-                    return "❌ No response to provide feedback for"
-                
-                return self.submit_feedback(query, response, int(rating), comments)
-            
+
             submit_feedback_btn.click(
-                fn=submit_feedback_handler,
+                fn=self.submit_feedback,
                 inputs=[response_query_input, generated_response_display, feedback_rating, feedback_comments],
                 outputs=[feedback_status]
             )
-        
+
         return interface
+
 
 
 def create_gradio_interface() -> gr.Blocks:
