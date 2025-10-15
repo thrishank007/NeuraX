@@ -7,6 +7,10 @@
 ## Overview
 NeuraX is a production-ready offline multimodal Retrieval-Augmented Generation (RAG) system designed for NTRO's SIH 2025 problem statement. It provides secure, air-gapped document intelligence with advanced multimodal capabilities and enterprise-grade security features.
 
+## Demo:
+
+[![Watch the video](https://img.youtube.com/vi/2qcBRtBl5q8/0.jpg)](https://youtu.be/2qcBRtBl5q8)
+
 ## ✨ Key Features
 
 ### 🔒 **Security & Privacy**
