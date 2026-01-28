@@ -14,17 +14,8 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from pydantic import BaseModel, Field
 
-from backend.core.settings import settings
-from backend.core.dependencies import get_neurax_service
-from backend.services.evaluation_service import get_evaluation_service, EvaluationService
-from backend.models.evaluation import (
-    EvaluationMetrics,
-    EvaluationConfig,
-    EvaluationRun,
-    TestCase,
-    TestDataset,
-    EvaluationStatusEnum,
-)
+from core.settings import settings
+from core.dependencies import get_neurax_service, get_evaluation_service
 
 router = APIRouter(prefix="/evaluation", tags=["evaluation"])
 
@@ -82,9 +73,9 @@ class ExportRequest(BaseModel):
     format: str = Field(default="json", pattern="^(json|csv|html)$")
 
 
-# ==================== Dependencies ====================
+# Dependencies
 
-def get_eval_service() -> EvaluationService:
+def get_eval_service():
     return get_evaluation_service()
 
 

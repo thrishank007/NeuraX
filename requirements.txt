@@ -1,71 +1,35 @@
-# Core RAG Framework
-# raganything[all]  # Commented out due to dependency conflicts
+# NeuraX - Backend Requirements
+# Core FastAPI and async dependencies
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
 
-# Multimodal Embeddings
-sentence-transformers
-# clip-by-openai  # Replaced with transformers CLIP
-transformers
-torch
-torchvision
+# HTTP client and requests
+httpx==0.25.2
+requests==2.31.0
 
-# Vector Database
-chromadb
+# Data validation and serialization
+pydantic==2.5.0
+python-multipart==0.0.6
 
-# Document Processing
-PyMuPDF
-python-docx
-pytesseract
-Pillow
+# Logging and monitoring
+loguru==0.7.2
 
-# Audio Processing
-openai-whisper
-librosa
-soundfile
+# File handling and utilities
+python-dotenv==1.0.0
+pathlib==1.0.1
 
-# LM Studio API (Primary LLM Interface)
-requests>=2.28.0  # For LM Studio API calls
-urllib3>=1.26.0   # HTTP library for requests
+# Vector database and embeddings (for future use)
+chromadb==0.4.18
+sentence-transformers==2.2.2
 
-# HuggingFace Models (Optional fallback when LM Studio is not available)
-# Note: These are now optional since we primarily use LM Studio
-accelerate>=0.21.0  # Optional: For HuggingFace model acceleration
-bitsandbytes>=0.41.0  # Optional: For model quantization
-transformers>=4.44.0  # Optional: For HuggingFace transformers
-torch>=2.0.0  # Optional: PyTorch for local models
-torchvision>=0.15.0  # Optional: Computer vision operations
-tokenizers>=0.15.0  # Optional: Tokenizer support
-safetensors>=0.3.0  # Optional: Safe tensor format
-huggingface-hub>=0.17.0  # Optional: HuggingFace model hub
-# Additional dependencies for multimodal models (Optional)
-timm>=0.9.0  # Optional: For vision transformers
-einops>=0.7.0  # Optional: For tensor operations
-# flash-attn>=2.0.0  # Optional: For flash attention (commented out, GPU only)
+# Optional dependencies for ML/AI (when system is fully integrated)
+# torch==2.1.0
+# transformers==4.36.0
+# whisper==20231117
+# clip-by-openai==1.0
 
-# Knowledge Graph
-networkx
-plotly
-pyvis
-
-# UI Frameworks
-gradio
-streamlit
-
-# Evaluation
-ragas
-datasets
-
-# Utilities
-numpy
-pandas
-scikit-learn
-tqdm
-loguru
-
-# Packaging
-pyinstaller
-auto-py-to-exe
-
-# Development
-pytest
-black
-flake8
+# Development dependencies
+pytest==7.4.3
+pytest-asyncio==0.21.1
+black==23.11.0
+isort==5.12.0

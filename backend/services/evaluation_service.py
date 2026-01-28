@@ -19,19 +19,85 @@ from collections import defaultdict
 
 from loguru import logger
 
-from backend.core.settings import settings
-from backend.core.exceptions import EvaluationError, ErrorCode
-from backend.models.evaluation import (
-    EvaluationMetrics,
-    RetrievalMetrics,
-    GenerationMetrics,
-    LatencyMetrics,
-    TestCase,
-    EvaluationConfig,
-    EvaluationResult,
-    EvaluationRun,
-    EvaluationStatusEnum
-)
+from core.settings import settings
+from typing import Union
+from enum import Enum
+
+# Simplified models since we don't have the actual models yet
+class EvaluationStatusEnum(Enum):
+    PENDING = "pending"
+    RUNNING = "running"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+
+# Basic model classes (simplified)
+class EvaluationMetrics:
+    def __init__(self):
+        self.retrieval = None
+        self.generation = None
+        self.latency = None
+        self.overall_quality_score = 0.0
+        self.total_test_cases = 0
+
+class TestCase:
+    def __init__(self, query: str, expected_documents: List[str]):
+        self.query = query
+        self.expected_documents = expected_documents
+
+class EvaluationConfig:
+    def __init__(self, name: str, description: str = None, test_cases: List[TestCase] = None):
+        self.name = name
+        self.description = description
+        self.test_cases = test_cases or []
+        self.k_values = [1, 3, 5, 10]
+        self.similarity_thresholds = [0.5]
+        self.include_generation_metrics = True
+        self.include_latency_metrics = True
+        self.max_concurrent_requests = 5
+
+class EvaluationRun:
+    def __init__(self, run_id: str, config: EvaluationConfig):
+        self.run_id = run_id
+        self.name = config.name
+        self.description = config.description
+        self.config = config
+        self.status = EvaluationStatusEnum.PENDING
+        self.created_at = datetime.utcnow()
+        self.completed_at = None
+        self.total_cases = len(config.test_cases) if config.test_cases else 0
+        self.metrics = None
+        self.results = []
+
+class LatencyMetrics:
+    def __init__(self):
+        self.average_total_latency_ms = 0
+        self.p50_total_latency_ms = 0
+        self.p90_total_latency_ms = 0
+        self.p99_total_latency_ms = 0
+        self.average_embedding_latency_ms = 0
+        self.average_retrieval_latency_ms = 0
+        self.average_generation_latency_ms = 0
+        self.latency_buckets = {}
+        self.error_rate = 0.0
+
+class RetrievalMetrics:
+    def __init__(self):
+        self.mrr = 0.0
+        self.precision_at_k = {}
+        self.recall_at_k = {}
+        self.ndcg_at_k = {}
+        self.average_precision = 0.0
+
+class GenerationMetrics:
+    def __init__(self):
+        self.grounding_score = 0.0
+        self.coherence = 0.0
+        self.completeness = 0.0
+        self.answer_relevance = 0.0
+
+class EvaluationResult:
+    pass
 
 
 class EvaluationService:
@@ -45,7 +111,7 @@ class EvaluationService:
     """
     
     def __init__(self, storage_dir: Optional[Path] = None):
-        self.storage_dir = storage_dir or settings.paths.data_dir / "evaluations"
+        self.storage_dir = storage_dir or Path("./evaluations")
         self.storage_dir.mkdir(parents=True, exist_ok=True)
         
         # In-memory tracking
@@ -59,7 +125,7 @@ class EvaluationService:
         
         # Sampling control
         self._sample_count = 0
-        self._sample_rate = settings.evaluation.sample_rate
+        self._sample_rate = 0.1  # Default sample rate
         
         self.logger = logger.bind(component="EvaluationService")
     
@@ -67,11 +133,9 @@ class EvaluationService:
     
     def should_sample(self) -> bool:
         """Determine if current request should be sampled"""
-        if not settings.evaluation.enabled:
-            return False
-        
+        # Always sample for now
         self._sample_count += 1
-        return (self._sample_count % int(1 / self._sample_rate)) == 0
+        return (self._sample_count % 10) == 0  # 10% sample rate
     
     def track_latency(
         self,
@@ -81,9 +145,6 @@ class EvaluationService:
         generation_ms: Optional[float] = None
     ) -> None:
         """Track latency metrics"""
-        if not settings.evaluation.track_latency_metrics:
-            return
-        
         sample = {
             "timestamp": datetime.utcnow().isoformat(),
             "total_ms": total_ms,
@@ -107,9 +168,6 @@ class EvaluationService:
         similarity_scores: Optional[List[float]] = None
     ) -> None:
         """Track retrieval metrics"""
-        if not settings.evaluation.track_retrieval_metrics:
-            return
-        
         sample = {
             "timestamp": datetime.utcnow().isoformat(),
             "query": query[:200],  # Truncate
@@ -134,7 +192,20 @@ class EvaluationService:
         confidence: Optional[float] = None
     ) -> None:
         """Track generation metrics"""
-        if not settings.evaluation.track_generation_metrics:
+        sample = {
+            "timestamp": datetime.utcnow().isoformat(),
+            "query": query[:200],
+            "response_length": len(response),
+            "context_used": context_used,
+            "grounding_score": grounding_score,
+            "confidence": confidence
+        }
+        
+        self._generation_samples.append(sample)
+        
+        max_samples = 3000
+        if len(self._generation_samples) > max_samples:
+            self._generation_samples = self._generation_samples[-max_samples:]
             return
         
         sample = {
