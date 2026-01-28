@@ -7,8 +7,8 @@ from typing import Dict, Any
 from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel
 
-from backend.services.neurax_service import NeuraXService
-from backend.utils.dependencies import get_neurax_service
+from core.settings import settings
+from core.dependencies import get_neurax_service
 
 
 router = APIRouter()
