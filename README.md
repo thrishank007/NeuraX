@@ -7,6 +7,10 @@
 ## Overview
 NeuraX is a production-ready offline multimodal Retrieval-Augmented Generation (RAG) system designed for NTRO's SIH 2025 problem statement. It provides secure, air-gapped document intelligence with advanced multimodal capabilities and enterprise-grade security features.
 
+## Demo:
+
+[![Watch the video](https://img.youtube.com/vi/2qcBRtBl5q8/0.jpg)](https://youtu.be/2qcBRtBl5q8)
+
 ## ✨ Key Features
 
 ### 🔒 **Security & Privacy**
@@ -70,8 +74,8 @@ NeuraX is a production-ready offline multimodal Retrieval-Augmented Generation (
 ### Option 1: Automated Installation (Recommended)
 ```bash
 # Clone the repository
-git clone https://github.com/thrishank007/SIH-SI.git
-cd SIH-SI
+git clone https://github.com/thrishank007/NeuraX.git
+cd NeuraX
 
 # Run automated setup
 python install_dependencies.py
@@ -86,8 +90,8 @@ python main_launcher.py
 ### Option 2: Manual Installation
 ```bash
 # Clone repository
-git clone https://github.com/thrishank007/SIH-SI.git
-cd SIH-SI
+git clone https://github.com/thrishank007/NeuraX.git
+cd NeuraX
 
 # Create virtual environment
 python -m venv venv
@@ -355,8 +359,8 @@ python build_executables.py --usb-deployment
 ### Development Setup
 ```bash
 # Clone for development
-git clone https://github.com/thrishank007/SIH-SI.git
-cd SIH-SI
+git clone https://github.com/thrishank007/NeuraX.git
+cd NeuraX
 
 # Install development dependencies
 pip install -r requirements.txt
@@ -411,4 +415,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 **Built with ❤️ for secure, offline AI document intelligence**
 
 For detailed documentation, visit: [Documentation](./docs/)  
-For support and issues: [GitHub Issues](https://github.com/thrishank007/SIH-SI/issues)
+For support and issues: [GitHub Issues](https://github.com/thrishank007/NeuraX/issues)
