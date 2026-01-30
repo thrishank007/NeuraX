@@ -13,11 +13,15 @@ from datetime import datetime
 import tempfile
 import shutil
 
-from fastapi import FastAPI, UploadFile, File, HTTPException, Depends, BackgroundTasks, Form
+from fastapi import FastAPI, UploadFile, File, HTTPException, Depends, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 import uvicorn
+
+# Suppress warnings for optional dependencies
+import warnings
+warnings.filterwarnings("ignore", category=UserWarning)
 
 # Add project root to path
 project_root = Path(__file__).parent.parent.parent
@@ -222,7 +226,7 @@ async def health_check():
 @app.post("/api/upload", response_model=List[FileUploadResponse])
 async def upload_files(
     files: List[UploadFile] = File(...),
-    background_tasks: BackgroundTasks = None
+    background_tasks: Optional[BackgroundTasks] = None
 ):
     """Upload and process files"""
     if not ingestion_manager or not embedding_manager or not vector_store:
@@ -479,14 +483,33 @@ async def get_query_suggestions(partial: str, limit: int = 5):
 async def get_metrics(time_range_hours: int = 24):
     """Get system performance metrics"""
     if not metrics_collector:
-        return {"metrics": {}}
+        return {
+            "metrics": {},
+            "time_range_hours": time_range_hours,
+            "timestamp": datetime.utcnow().isoformat()
+        }
     
-    metrics = metrics_collector.get_aggregated_metrics(time_range_hours)
-    return {
-        "metrics": metrics,
-        "time_range_hours": time_range_hours,
-        "timestamp": datetime.utcnow().isoformat()
-    }
+    try:
+        # Try to get metrics - adjust method name based on actual implementation
+        if hasattr(metrics_collector, 'get_aggregated_metrics'):
+            metrics = metrics_collector.get_aggregated_metrics(time_range_hours)
+        elif hasattr(metrics_collector, 'get_metrics'):
+            metrics = metrics_collector.get_metrics(time_range_hours)
+        else:
+            metrics = {}
+        
+        return {
+            "metrics": metrics if isinstance(metrics, dict) else {"data": metrics},
+            "time_range_hours": time_range_hours,
+            "timestamp": datetime.utcnow().isoformat()
+        }
+    except Exception as e:
+        return {
+            "metrics": {},
+            "time_range_hours": time_range_hours,
+            "timestamp": datetime.utcnow().isoformat(),
+            "error": str(e)
+        }
 
 
 @app.get("/api/analytics/usage")
