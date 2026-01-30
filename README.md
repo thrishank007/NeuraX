@@ -1,418 +1,298 @@
-# NeuraX - Offline Multimodal RAG System
+# NeuraX - Production-Ready Multimodal RAG System
 
-[![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)]()
+A complete offline-first Retrieval-Augmented Generation (RAG) system with multimodal capabilities, featuring a modern Next.js frontend and Python FastAPI backend.
 
-## Overview
-NeuraX is a production-ready offline multimodal Retrieval-Augmented Generation (RAG) system designed for NTRO's SIH 2025 problem statement. It provides secure, air-gapped document intelligence with advanced multimodal capabilities and enterprise-grade security features.
+## Architecture Overview
 
-## Demo:
+### Backend (Python)
+- **FastAPI REST API** (`backend/api/main.py`) - RESTful API wrapper
+- **Document Processing** - PDF, DOCX, TXT, Images, Audio with OCR and STT
+- **Vector Store** - ChromaDB for semantic search
+- **LLM Integration** - LM Studio (Gemma 3n for multimodal, Qwen 4B for reasoning)
+- **Knowledge Graph** - NetworkX-based security and anomaly detection
+- **Feedback System** - User feedback collection and metrics
 
-[![Watch the video](https://img.youtube.com/vi/2qcBRtBl5q8/0.jpg)](https://youtu.be/2qcBRtBl5q8)
+### Frontend (Next.js)
+- **Next.js 14+** with App Router
+- **TypeScript** strict mode
+- **Tailwind CSS** + shadcn/ui components
+- **Responsive Design** with dark mode
+- **Real-time Updates** via WebSocket (optional)
 
-## ✨ Key Features
+## Quick Start
 
-### 🔒 **Security & Privacy**
-- **Complete Offline Operation**: Zero internet dependencies, air-gapped deployment
-- **Knowledge Graph Security**: Real-time anomaly detection and tamper protection
-- **Audit Logging**: Comprehensive activity tracking and compliance monitoring
-- **Data Sovereignty**: All processing occurs locally with no external API calls
+### 1. Backend Setup
 
-### 🤖 **Advanced AI Capabilities**
-- **Multimodal Understanding**: Process documents, images, and audio seamlessly
-- **Cross-Modal Search**: Find relevant content across different data types
-- **LM Studio Integration**: Local LLM hosting with Gemma 3n (multimodal) and Qwen3 4B (reasoning)
-- **CLIP Embeddings**: State-of-the-art visual-text similarity matching
-- **Intelligent Citations**: Numbered references with confidence scores and expandable sources
-
-### 📁 **Comprehensive Format Support**
-- **Documents**: PDF, DOCX, DOC, TXT with OCR fallback
-- **Images**: JPG, JPEG, PNG, BMP, TIFF, WEBP with visual similarity search
-- **Audio**: WAV, MP3, M4A, FLAC, OGG with speech-to-text processing
-- **Batch Processing**: Handle multiple files simultaneously with progress tracking
-
-### 🚀 **Production Features**
-- **Auto-Deployment**: One-click executable generation with PyInstaller
-- **USB Portability**: Export complete system to USB for air-gapped deployment
-- **Performance Optimization**: Memory-efficient processing with GPU acceleration
-- **Error Resilience**: Graceful degradation and comprehensive error handling
-- **Real-time Feedback**: User feedback collection and performance metrics
-
-## 🏗️ Architecture
-
-### Core Components
-- **LM Studio Integration**: Local LLM server for multimodal and reasoning tasks
-- **ChromaDB**: Persistent vector database for semantic search
-- **CLIP Embeddings**: Visual-text cross-modal understanding
-- **Whisper STT**: Speech-to-text for audio processing
-- **NetworkX**: Knowledge graph with security monitoring
-- **Gradio UI**: Modern web interface for end users
-- **Streamlit Dashboard**: Analytics and system monitoring
-
-## 🛠️ System Requirements
-
-### Minimum Requirements
-- **Python**: 3.8+ (3.9+ recommended for optimal performance)
-- **Memory**: 8GB RAM (16GB+ recommended for large datasets)
-- **Storage**: 5GB free space (models are managed via LM Studio)
-- **OS**: Windows 10+, Linux (Ubuntu 18.04+), macOS 10.15+
-
-### Recommended Setup
-- **Memory**: 16GB+ RAM for smooth operation
-- **GPU**: 6GB+ VRAM for accelerated processing (CPU fallback available)
-- **Storage**: 10GB+ for cache and data processing
-- **Network**: None required during operation (offline-first design)
-
-### Dependencies
-- **LM Studio**: For local LLM hosting (Gemma 3n + Qwen3 4B)
-- **Tesseract OCR**: For document text extraction (auto-bundled)
-- **FFmpeg**: For audio processing (platform-specific installation)
-
-## 🚀 Quick Start
-
-### Option 1: Automated Installation (Recommended)
 ```bash
-# Clone the repository
-git clone https://github.com/thrishank007/NeuraX.git
-cd NeuraX
+# Install Python dependencies
+pip install -r requirements.txt
 
-# Run automated setup
-python install_dependencies.py
+# Install FastAPI and uvicorn if not already installed
+pip install fastapi uvicorn python-multipart
 
-# Setup LM Studio integration
-python migrate_to_lmstudio.py
-
-# Launch the system
-python main_launcher.py
+# Start the FastAPI backend
+cd backend/api
+python main.py
+# or
+uvicorn backend.api.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-### Option 2: Manual Installation
-```bash
-# Clone repository
-git clone https://github.com/thrishank007/NeuraX.git
-cd NeuraX
+The backend API will be available at `http://localhost:8000`
 
-# Create virtual environment
-python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+### 2. Frontend Setup
+
+```bash
+# Navigate to frontend directory
+cd neurax-frontend
 
 # Install dependencies
-pip install -r requirements.txt
+npm install
 
-# Install system dependencies (platform-specific)
-# Ubuntu/Debian: sudo apt-get install tesseract-ocr ffmpeg
-# macOS: brew install tesseract ffmpeg
-# Windows: Automated via install_dependencies.py
+# Set up environment variables
+cp .env.local.example .env.local
+# Edit .env.local with your configuration
 
-# Launch system
-python main_launcher.py
+# Start development server
+npm run dev
 ```
 
-### Option 3: Portable Executable
+The frontend will be available at `http://localhost:3000`
+
+### 3. LM Studio Setup (Optional but Recommended)
+
+1. Download and install [LM Studio](https://lmstudio.ai/)
+2. Load models:
+   - **Gemma 3n** (for multimodal queries)
+   - **Qwen3 4B Thinking** (for text reasoning)
+3. Start the local server on port 1234
+4. The backend will automatically connect to LM Studio
+
+## Features
+
+### Document Management
+- Upload PDF, DOCX, TXT, Images (JPG, PNG, etc.), Audio (WAV, MP3, etc.)
+- Automatic processing and indexing
+- Batch upload support
+- File type validation and size limits
+
+### Multimodal Queries
+- **Text Queries** - Natural language questions
+- **Voice Queries** - Speech-to-text input
+- **Image Queries** - Visual search (coming soon)
+- **Multimodal** - Combined text + image queries
+
+### Results & Citations
+- Numbered citations with expandable sources
+- Confidence scores and similarity metrics
+- Document previews
+- Export capabilities (JSON, CSV)
+
+### Analytics Dashboard
+- Performance metrics (retrieval, generation, latency)
+- Usage statistics
+- Security alerts and anomaly detection
+- Knowledge graph visualization
+
+### Configuration
+- LM Studio connection settings
+- Search parameters (similarity threshold, max results)
+- Model preferences
+- Performance tuning
+
+## API Endpoints
+
+### File Upload
+- `POST /api/upload` - Upload and process files
+- `GET /api/files` - List uploaded files
+- `DELETE /api/files/{file_id}` - Delete a file
+
+### Query Processing
+- `POST /api/query` - Process text query
+- `POST /api/query/voice` - Process voice query
+- `GET /api/query/history` - Get query history
+- `GET /api/query/suggestions` - Get auto-complete suggestions
+
+### Analytics
+- `GET /api/analytics/metrics` - Get performance metrics
+- `GET /api/analytics/usage` - Get usage statistics
+- `GET /api/analytics/security` - Get security events
+- `GET /api/knowledge-graph` - Get knowledge graph data
+
+### Feedback
+- `POST /api/feedback` - Submit feedback
+- `GET /api/feedback/history` - Get feedback history
+- `GET /api/feedback/analytics` - Get feedback analytics
+
+### Configuration
+- `GET /api/config` - Get current configuration
+- `PUT /api/config` - Update configuration
+- `POST /api/config/validate` - Validate configuration
+
+### Health
+- `GET /api/health` - Health check
+
+## Development
+
+### Backend Development
+
 ```bash
-# Build portable executable
-python build_executables.py
+# Run with auto-reload
+uvicorn backend.api.main:app --reload
 
-# Deploy to USB or air-gapped system
-# Executable will be in packages/ directory
+# Run tests (if available)
+pytest
 ```
 
-## 🎯 LM Studio Setup (Required)
+### Frontend Development
 
-NeuraX uses LM Studio for local LLM hosting, providing better performance and easier model management:
-
-### 1. Install LM Studio
-- Download from [https://lmstudio.ai/](https://lmstudio.ai/)
-- Install and launch the application
-
-### 2. Download Models
-In LM Studio, search for and download:
-- **Gemma 3n**: For multimodal queries (text + images)
-- **Qwen3 4B Thinking 2507**: For complex reasoning tasks
-
-### 3. Start Local Server
-1. Go to "Local Server" tab in LM Studio
-2. Load your preferred model (Gemma for multimodal, Qwen for reasoning)
-3. Start server on `localhost:1234`
-4. Verify server is running with green status indicator
-
-### 4. Test Integration
 ```bash
-python test_lmstudio_integration.py
+# Development server with hot reload
+npm run dev
+
+# Type checking
+npm run type-check
+
+# Linting
+npm run lint
+
+# Production build
+npm run build
+npm start
 ```
 
-## 💻 Usage Examples
+## Project Structure
 
-### Basic Document Processing
-```python
-# Upload documents via Gradio interface
-# Supported: PDF, DOCX, DOC, TXT files
-# Automatic text extraction and indexing
-
-# Query your documents
-query = "What are the main findings in the research?"
-# System returns relevant passages with citations
+```
+.
+├── backend/
+│   ├── api/
+│   │   └── main.py              # FastAPI application
+│   ├── routers/                  # API route modules
+│   ├── services/                 # Business logic services
+│   ├── models/                   # Pydantic models
+│   └── core/                     # Core utilities
+│
+├── neurax-frontend/              # Next.js frontend
+│   ├── app/                      # Next.js app directory
+│   ├── components/               # React components
+│   ├── lib/                      # Utilities and API clients
+│   └── public/                   # Static assets
+│
+├── ingestion/                    # Document processing
+├── indexing/                     # Vector store and embeddings
+├── retrieval/                    # Query processing
+├── generation/                   # LLM integration
+├── kg_security/                  # Knowledge graph and security
+├── feedback/                     # Feedback system
+└── config.py                     # Configuration
 ```
 
-### Multimodal Search
-```python
-# Upload images along with documents
-# Supported: JPG, PNG, BMP, TIFF, WEBP
+## Configuration
 
-# Cross-modal queries
-query = "Find documents related to this chart"
-# System matches visual content with textual descriptions
-```
+### Environment Variables
 
-### Audio Processing
-```python
-# Upload audio files
-# Supported: WAV, MP3, M4A, FLAC, OGG
+**Backend:**
+- Configure in `config.py` or via environment variables
+- LM Studio URL: `http://localhost:1234/v1` (default)
 
-# Audio-to-text search
-query = "What was discussed about budget planning?"
-# System transcribes audio and searches content
-```
+**Frontend:**
+- `NEXT_PUBLIC_API_URL` - Backend API URL (default: `http://localhost:8000`)
+- `NEXT_PUBLIC_LM_STUDIO_URL` - LM Studio URL (default: `http://localhost:1234`)
+- `NEXT_PUBLIC_MAX_FILE_SIZE` - Max file size in bytes (default: 100MB)
 
-## 📂 Project Structure
-```
-NeuraX/
-├── 📁 ingestion/              # Multimodal data processors
-│   ├── document_processor.py  # PDF, DOCX, DOC, TXT processing
-│   ├── image_processor.py     # Image analysis and OCR
-│   ├── audio_processor.py     # Speech-to-text conversion
-│   ├── notes_processor.py     # Structured note processing
-│   └── ingestion_manager.py   # Orchestrates all processors
-│
-├── 📁 indexing/               # Vector embeddings and storage
-│   ├── embedding_manager.py   # CLIP + text embeddings
-│   ├── vector_store.py        # ChromaDB interface
-│   ├── cache_manager.py       # Embedding cache optimization
-│   ├── memory_manager.py      # Memory usage optimization
-│   └── performance_benchmarker.py # Performance monitoring
-│
-├── 📁 retrieval/              # Query processing
-│   ├── query_processor.py     # Multimodal query handling
-│   └── speech_to_text_processor.py # Audio query processing
-│
-├── 📁 generation/             # LLM integration
-│   ├── lmstudio_generator.py  # LM Studio API client
-│   ├── llm_factory.py         # Model selection logic
-│   ├── llm_generator.py       # Legacy HF integration
-│   └── citation_generator.py  # Citation formatting
-│
-├── 📁 kg_security/            # Knowledge graph security
-│   ├── knowledge_graph_manager.py # Graph construction
-│   ├── anomaly_detector.py    # Security monitoring
-│   ├── security_event_logger.py # Audit logging
-│   └── feedback_integration.py # User feedback processing
-│
-├── 📁 feedback/               # Feedback system
-│   ├── feedback_system.py     # User feedback collection
-│   ├── metrics_collector.py   # Performance metrics
-│   └── 📁 exports/            # Feedback data exports
-│
-├── 📁 ui/                     # User interfaces
-│   ├── gradio_app.py          # Main web interface
-│   ├── streamlit_dashboard.py # Analytics dashboard
-│   └── demo_gradio_app.py     # Demo interface
-│
-├── 📁 tests/                  # Comprehensive test suite
-│   ├── test_*.py              # Unit and integration tests
-│   └── conftest.py            # Test configuration
-│
-├── 📁 models/                 # Local model cache (LM Studio managed)
-├── 📁 data/                   # Input data and samples
-├── 📁 vector_db/              # ChromaDB persistent storage
-├── 📁 cache/                  # Embedding and processing cache
-├── 📁 logs/                   # System logs and error reports
-│
-├── 🔧 config.py               # Central configuration
-├── 🚀 main_launcher.py        # Application orchestrator
-├── 📋 requirements.txt        # Python dependencies
-├── 🛠️ install_dependencies.py # Automated setup script
-├── 📦 build_executables.py    # Portable build script
-├── 🔄 migrate_to_lmstudio.py  # LM Studio migration tool
-└── 🧪 test_*.py              # Verification and test scripts
-```
+## Deployment
 
-## 🔧 Configuration
+### Docker (Recommended)
 
-### Core Settings (`config.py`)
-```python
-# LM Studio Configuration
-LM_STUDIO_CONFIG = {
-    "base_url": "http://localhost:1234/v1",
-    "gemma_model": "google/gemma-3n",           # Multimodal model
-    "qwen_model": "qwen/qwen3-4b-thinking-2507", # Reasoning model
-    "auto_model_switching": True,               # Auto switch based on query type
-}
-
-# Security Configuration
-SECURITY_CONFIG = {
-    "allowed_file_extensions": [
-        ".pdf", ".docx", ".doc", ".txt",        # Documents
-        ".jpg", ".jpeg", ".png", ".bmp", ".tiff", ".webp", # Images
-        ".wav", ".mp3", ".m4a", ".flac", ".ogg" # Audio
-    ],
-    "max_file_size_mb": 100,
-    "enable_audit_logging": True,
-}
-```
-
-### Advanced Configuration
-- **Performance tuning**: Memory thresholds, batch sizes, GPU settings
-- **Security policies**: File validation, audit logging, anomaly detection
-- **UI customization**: Interface themes, component visibility
-- **Model preferences**: LLM selection, embedding models, fallback strategies
-
-## 🧪 Testing & Validation
-
-### Automated Testing Suite
 ```bash
-# Run complete test suite
-python -m pytest tests/
-
-# Test specific components
-python test_image_query_no_ocr.py     # Image processing
-python test_multimodal_simple.py      # Multimodal queries  
-python test_lmstudio_integration.py   # LM Studio integration
-python test_final_verification.py     # End-to-end validation
+# Build and run with Docker Compose
+docker-compose up -d
 ```
 
-### Manual Testing
-```bash
-# Test file upload interface
-python test_file_upload_interface_fix.py
+### Manual Deployment
 
-# Validate system performance  
-python test_vector_store.py
+1. **Backend:**
+   ```bash
+   # Install dependencies
+   pip install -r requirements.txt
+   
+   # Run with production server
+   uvicorn backend.api.main:app --host 0.0.0.0 --port 8000
+   ```
 
-# Check citation generation
-python test_citation_fix.py
-```
+2. **Frontend:**
+   ```bash
+   cd neurax-frontend
+   npm install
+   npm run build
+   npm start
+   ```
 
-## 🚢 Deployment Options
+## Offline Operation
 
-### Option 1: Standard Installation
-- Install Python dependencies via pip
-- Setup LM Studio separately
-- Run via `python main_launcher.py`
+The system is designed for offline/air-gapped deployment:
 
-### Option 2: Portable Executable
-```bash
-# Build self-contained executable
-python build_executables.py
+- All models run locally (LM Studio)
+- No external API dependencies
+- Local vector database (ChromaDB)
+- Offline document processing
+- Local feedback storage
 
-# Generates:
-# - NeuraX-Windows-x64.zip
-# - USB_Deployment/ folder for air-gapped systems
-```
+## Security
 
-### Option 3: USB Deployment
-```bash
-# Create USB-ready package
-python build_executables.py --usb-deployment
+- Input validation and sanitization
+- File type and size validation
+- CORS configuration
+- Audit logging
+- Anomaly detection
+- Knowledge graph security layer
 
-# Copy USB_Deployment/ contents to USB drive
-# Includes autorun.inf for Windows systems
-```
+## Performance
 
-### Air-Gapped Deployment
-1. Build executable on internet-connected system
-2. Copy package to air-gapped environment
-3. Install LM Studio and download models offline
-4. Run executable with zero internet dependencies
+- Efficient embedding caching
+- Batch processing support
+- Memory optimization
+- Progressive loading for large datasets
+- Connection pooling
 
-## 📊 Performance Metrics
+## Troubleshooting
 
-### Processing Speeds
-- **Document Indexing**: 50-100 documents/minute
-- **Image Processing**: 25-50 images/minute  
-- **Audio Transcription**: Real-time (1x speed with Whisper-tiny)
-- **Query Response**: 200-500ms average
-- **Vector Search**: 4.7+ items/second similarity search
+### Backend Issues
 
-### Resource Usage
-- **Memory**: 4-8GB typical usage (scales with data size)
-- **Storage**: 100MB base + data size + cache
-- **GPU**: Optional but recommended for large datasets
-- **CPU**: Efficient with multi-core utilization
+1. **LM Studio not connecting:**
+   - Ensure LM Studio is running on port 1234
+   - Check `LM_STUDIO_CONFIG` in `config.py`
 
-## 🛡️ Security Features
+2. **Vector store errors:**
+   - Check `vector_db/` directory permissions
+   - Ensure ChromaDB is properly installed
 
-### Data Protection
-- **Local Processing**: All data remains on local system
-- **Encrypted Storage**: Vector database encryption at rest
-- **Audit Trails**: Comprehensive activity logging
-- **Access Control**: File type and size validation
+3. **Import errors:**
+   - Verify all dependencies in `requirements.txt` are installed
+   - Check Python path configuration
 
-### Anomaly Detection
-- **Knowledge Graph Monitoring**: Real-time graph analysis
-- **Behavioral Analysis**: Unusual query pattern detection
-- **Tamper Detection**: Content integrity verification
-- **Alert System**: Automated security event notifications
+### Frontend Issues
 
-## 🤝 Contributing & Support
+1. **API connection errors:**
+   - Verify backend is running on port 8000
+   - Check `NEXT_PUBLIC_API_URL` in `.env.local`
 
-### Development Setup
-```bash
-# Clone for development
-git clone https://github.com/thrishank007/NeuraX.git
-cd NeuraX
+2. **Build errors:**
+   - Run `npm install` to ensure all dependencies are installed
+   - Check TypeScript errors with `npm run type-check`
 
-# Install development dependencies
-pip install -r requirements.txt
-pip install pytest black flake8
+## Contributing
 
-# Run tests before committing
-python -m pytest tests/
-```
+1. Follow code style guidelines
+2. Write tests for new features
+3. Update documentation
+4. Ensure TypeScript strict mode compliance
+5. Test on multiple browsers
 
-### Known Issues & Solutions
-- **Tesseract OCR**: Auto-bundled in executables, manual install for dev
-- **GPU Memory**: Adjust batch sizes in config for lower VRAM systems
-- **LM Studio Connection**: Ensure server is running on localhost:1234
-- **Large Files**: Use batch processing for datasets >1GB
+## License
 
-### Documentation
-- **API Reference**: `/docs/api/` (generated from code)
-- **Architecture Guide**: `/docs/architecture.md`
-- **Deployment Guide**: `/docs/deployment.md`
-- **Troubleshooting**: `/docs/troubleshooting.md`
+See LICENSE file for details.
 
-## 📈 Roadmap
+## Support
 
-### Current Version (v1.0)
-- ✅ Complete offline multimodal RAG system
-- ✅ LM Studio integration with Gemma 3n + Qwen3 4B
-- ✅ Cross-modal search capabilities
-- ✅ Portable executable generation
-- ✅ Enterprise security features
-
-### Future Enhancements (v1.1+)
-- 🔄 Additional LLM integrations (Ollama, LocalAI)
-- 🔄 Enhanced video processing capabilities
-- 🔄 Multi-language support expansion
-- 🔄 Advanced analytics dashboard
-- 🔄 Distributed deployment options
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 🏆 Acknowledgments
-
-- **NTRO SIH 2025**: Problem statement and requirements definition
-- **Hugging Face**: CLIP and Transformer models
-- **LM Studio**: Local LLM hosting platform
-- **ChromaDB**: Vector database infrastructure
-- **Gradio**: Modern web interface framework
-
----
-
-**Built with ❤️ for secure, offline AI document intelligence**
-
-For detailed documentation, visit: [Documentation](./docs/)  
-For support and issues: [GitHub Issues](https://github.com/thrishank007/NeuraX/issues)
+For issues, questions, or contributions, please refer to the project documentation or create an issue in the repository.
