@@ -74,7 +74,17 @@ const config = {
       },
     },
   },
-  plugins: [require("tailwindcss-animate")],
+  plugins: [
+    // Use dynamic require to handle missing package gracefully
+    (() => {
+      try {
+        return require("tailwindcss-animate");
+      } catch (e) {
+        console.warn("tailwindcss-animate not found. Run 'npm install' to install dependencies.");
+        return null;
+      }
+    })(),
+  ].filter(Boolean),
 } satisfies Config
 
 export default config
