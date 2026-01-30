@@ -8,10 +8,7 @@ class ApiClient {
   constructor() {
     this.client = axios.create({
       baseURL: API_URL,
-      timeout: 120000, // 2 minutes for file uploads and queries
-      headers: {
-        "Content-Type": "application/json",
-      },
+      timeout: 300000, // 5 minutes for file uploads (processing can take time)
     });
 
     // Request interceptor
@@ -70,21 +67,34 @@ class ApiClient {
       formData.append("files", file);
     });
 
-    const response = await this.client.post("/api/upload", formData, {
-      headers: {
-        "Content-Type": "multipart/form-data",
-      },
-      onUploadProgress: (progressEvent) => {
-        if (onProgress && progressEvent.total) {
-          const progress = Math.round(
-            (progressEvent.loaded * 100) / progressEvent.total
-          );
-          onProgress(progress);
-        }
-      },
-    });
+    try {
+      const response = await this.client.post("/api/upload", formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+        onUploadProgress: (progressEvent) => {
+          if (onProgress && progressEvent.total) {
+            const progress = Math.round(
+              (progressEvent.loaded * 100) / progressEvent.total
+            );
+            onProgress(progress);
+          }
+        },
+        timeout: 300000, // 5 minutes for processing
+      });
 
-    return response.data;
+      return response.data;
+    } catch (error: any) {
+      // Enhanced error logging
+      console.error("Upload error:", error);
+      if (error.response) {
+        throw new Error(error.response.data?.detail || error.response.data?.message || "Upload failed");
+      } else if (error.request) {
+        throw new Error("No response from server. Check if backend is running.");
+      } else {
+        throw new Error(error.message || "Upload failed");
+      }
+    }
   }
 }
 

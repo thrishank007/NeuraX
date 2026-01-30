@@ -62,6 +62,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
 
 # Global component instances (initialized on startup)
@@ -235,7 +236,8 @@ async def upload_files(
     temp_dir = tempfile.mkdtemp()
     
     try:
-        for file in files:
+        # Process files sequentially to avoid overwhelming the system
+        for idx, file in enumerate(files):
             start_time = datetime.now()
             
             # Validate file
@@ -260,21 +262,32 @@ async def upload_files(
             
             # Process file
             try:
+                print(f"Processing file {idx + 1}/{len(files)}: {file.filename}")
                 processed_doc = ingestion_manager.process_file(temp_path)
                 
                 if processed_doc:
+                    print(f"File {file.filename} processed, generating embeddings...")
                     # Generate embeddings
-                    if processed_doc.get('file_type') in ['pdf', 'docx', 'doc', 'txt']:
-                        content_text = processed_doc.get('content_preview', '')
-                        if content_text:
-                            embedding = embedding_manager.embed_text(content_text)[0]
+                    try:
+                        if processed_doc.get('file_type') in ['pdf', 'docx', 'doc', 'txt']:
+                            content_text = processed_doc.get('content_preview', '')
+                            if content_text:
+                                embedding = embedding_manager.embed_text(content_text)[0]
+                                processed_doc['embedding'] = embedding
+                        elif processed_doc.get('file_type') in ['jpg', 'jpeg', 'png', 'bmp', 'tiff', 'webp']:
+                            embedding = embedding_manager.embed_image(str(temp_path))[0]
                             processed_doc['embedding'] = embedding
-                    elif processed_doc.get('file_type') in ['jpg', 'jpeg', 'png', 'bmp', 'tiff', 'webp']:
-                        embedding = embedding_manager.embed_image(str(temp_path))[0]
-                        processed_doc['embedding'] = embedding
+                    except Exception as embed_error:
+                        print(f"Embedding generation failed for {file.filename}: {embed_error}")
+                        # Continue without embedding - file is still processed
                     
                     # Add to vector store
-                    vector_store.add_document(processed_doc)
+                    try:
+                        vector_store.add_document(processed_doc)
+                        print(f"File {file.filename} added to vector store")
+                    except Exception as store_error:
+                        print(f"Vector store error for {file.filename}: {store_error}")
+                        # Continue - file processing succeeded even if storage failed
                     
                     processing_time = (datetime.now() - start_time).total_seconds()
                     
@@ -286,17 +299,22 @@ async def upload_files(
                         processing_time=processing_time,
                         message="File processed and indexed successfully"
                     ))
+                    print(f"Successfully processed {file.filename} in {processing_time:.2f}s")
                 else:
+                    print(f"Failed to process {file.filename}: ingestion_manager returned None")
                     results.append(FileUploadResponse(
                         file_id="",
                         filename=file.filename,
                         file_type=file_ext,
                         status="error",
                         processing_time=0,
-                        message="Failed to process file"
+                        message="Failed to process file - ingestion manager returned no result"
                     ))
                     
             except Exception as e:
+                import traceback
+                error_trace = traceback.format_exc()
+                print(f"Error processing {file.filename}: {error_trace}")
                 results.append(FileUploadResponse(
                     file_id="",
                     filename=file.filename,

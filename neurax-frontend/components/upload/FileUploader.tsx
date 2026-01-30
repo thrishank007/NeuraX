@@ -87,24 +87,47 @@ export function FileUploader({ onUploadComplete }: FileUploaderProps) {
     setUploadProgress(0)
 
     try {
+      // Show initial progress
+      setUploadProgress(5)
+      
       const results = await documentsApi.uploadFiles(files, (progress) => {
-        setUploadProgress(progress)
+        // Clamp progress between 5% and 95% to account for backend processing
+        const clampedProgress = Math.min(95, Math.max(5, progress))
+        setUploadProgress(clampedProgress)
       })
 
+      // Complete progress
+      setUploadProgress(100)
+      
       setUploadResults(results)
-      toast.success(`Successfully uploaded ${results.length} file(s)`)
+      
+      // Check if all uploads succeeded
+      const successCount = results.filter(r => r.status === "success").length
+      const errorCount = results.filter(r => r.status === "error").length
+      
+      if (successCount > 0 && errorCount === 0) {
+        toast.success(`Successfully uploaded ${successCount} file(s)`)
+      } else if (successCount > 0 && errorCount > 0) {
+        toast.success(`Uploaded ${successCount} file(s), ${errorCount} failed`)
+      } else {
+        toast.error(`Failed to upload ${errorCount} file(s)`)
+      }
       
       if (onUploadComplete) {
         onUploadComplete(results)
       }
 
-      // Clear files after successful upload
+      // Clear files after upload (success or failure)
       setFiles([])
     } catch (error: any) {
-      toast.error(error.message || "Failed to upload files")
+      console.error("Upload error:", error)
+      toast.error(error.message || "Failed to upload files. Check console for details.")
     } finally {
       setUploading(false)
-      setUploadProgress(0)
+      // Keep progress at 100 if successful, reset if error
+      if (uploadResults.length === 0) {
+        setUploadProgress(0)
+      }
     }
   }
 
