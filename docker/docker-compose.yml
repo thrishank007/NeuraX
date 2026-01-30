@@ -1,0 +1,59 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: ../docker/Dockerfile.backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+      - ./data:/app/data
+      - ./vector_db:/app/vector_db
+      - ./models:/app/models
+    environment:
+      - ENVIRONMENT=development
+      - API_HOST=0.0.0.0
+      - API_PORT=8000
+      - LM_STUDIO_URL=http://host.docker.internal:1234
+    depends_on:
+      - chromadb
+    networks:
+      - neurax-network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: ../docker/Dockerfile.frontend
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+      - NEXT_PUBLIC_LM_STUDIO_URL=http://localhost:1234
+    depends_on:
+      - backend
+    networks:
+      - neurax-network
+
+  chromadb:
+    image: chromadb/chroma:latest
+    ports:
+      - "8001:8000"
+    volumes:
+      - ./vector_db:/chroma/chroma
+    environment:
+      - IS_PERSISTENT=TRUE
+    networks:
+      - neurax-network
+
+networks:
+  neurax-network:
+    driver: bridge
+
+volumes:
+  vector_db_data:
+  models_data:
