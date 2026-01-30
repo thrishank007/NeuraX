@@ -225,8 +225,7 @@ async def health_check():
 
 @app.post("/api/upload", response_model=List[FileUploadResponse])
 async def upload_files(
-    files: List[UploadFile] = File(...),
-    background_tasks: Optional[BackgroundTasks] = None
+    files: List[UploadFile] = File(...)
 ):
     """Upload and process files"""
     if not ingestion_manager or not embedding_manager or not vector_store:
