@@ -222,6 +222,16 @@ async def health_check():
     }
 
 
+@app.get("/api/test")
+async def test_endpoint():
+    """Simple test endpoint to verify API connectivity"""
+    return {
+        "message": "API is working",
+        "timestamp": datetime.utcnow().isoformat(),
+        "backend_url": str(API_URL) if 'API_URL' in globals() else "unknown"
+    }
+
+
 # ==================== File Upload ====================
 
 @app.post("/api/upload", response_model=List[FileUploadResponse])
