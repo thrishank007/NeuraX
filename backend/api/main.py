@@ -490,11 +490,17 @@ async def get_metrics(time_range_hours: int = 24):
         }
     
     try:
-        # Try to get metrics - adjust method name based on actual implementation
-        if hasattr(metrics_collector, 'get_aggregated_metrics'):
-            metrics = metrics_collector.get_aggregated_metrics(time_range_hours)
-        elif hasattr(metrics_collector, 'get_metrics'):
-            metrics = metrics_collector.get_metrics(time_range_hours)
+        # MetricsCollector has generate_metrics_report method
+        # For now, return basic structure - can be enhanced later
+        if hasattr(metrics_collector, 'generate_metrics_report'):
+            # Convert days to hours for the report
+            days = max(1, time_range_hours // 24)
+            metrics = metrics_collector.generate_metrics_report(days=days)
+        elif hasattr(metrics_collector, '_get_aggregated_query_metrics'):
+            metrics = {
+                "query_metrics": metrics_collector._get_aggregated_query_metrics(),
+                "benchmark_metrics": metrics_collector._get_aggregated_benchmark_metrics() if hasattr(metrics_collector, '_get_aggregated_benchmark_metrics') else {}
+            }
         else:
             metrics = {}
         
