@@ -87,57 +87,138 @@ async def startup_event():
     global query_processor, llm_generator, citation_generator
     global feedback_system, kg_manager, metrics_collector, stt_processor
     
+    import traceback
+    
+    print("🚀 Starting NeuraX Backend API initialization...")
+    
+    # Initialize ingestion manager
     try:
-        # Initialize ingestion manager
+        print("Initializing ingestion manager...")
         ingestion_manager = IngestionManager()
-        
-        # Initialize embedding manager
+        print("✅ Ingestion manager initialized")
+    except Exception as e:
+        print(f"⚠️ Failed to initialize ingestion manager: {e}")
+        ingestion_manager = None
+    
+    # Initialize embedding manager
+    try:
+        print("Initializing embedding manager...")
         embedding_manager = EmbeddingManager()
-        
-        # Initialize vector store
+        print("✅ Embedding manager initialized")
+    except Exception as e:
+        print(f"⚠️ Failed to initialize embedding manager: {e}")
+        print(traceback.format_exc())
+        embedding_manager = None
+    
+    # Initialize vector store
+    try:
+        print("Initializing vector store...")
         vector_store = VectorStore(
             persist_directory=str(VECTOR_DB_DIR),
             collection_name=CHROMA_CONFIG['collection_name']
         )
-        
-        # Initialize query processor
-        query_processor = QueryProcessor(
-            embedding_manager,
-            vector_store,
-            {
-                'similarity_threshold': 0.5,
-                'max_results': 10,
-                'enable_cross_modal': True
-            }
-        )
-        
-        # Initialize LLM generator
-        llm_generator = LMStudioGenerator(LM_STUDIO_CONFIG)
-        
-        # Initialize citation generator
-        citation_generator = CitationGenerator()
-        
-        # Initialize feedback system
-        feedback_system = FeedbackSystem()
-        
-        # Initialize knowledge graph manager
-        kg_manager = KnowledgeGraphManager()
-        
-        # Initialize metrics collector
-        metrics_collector = MetricsCollector()
-        
-        # Initialize speech-to-text processor (optional)
-        try:
-            stt_processor = SpeechToTextProcessor()
-        except Exception as e:
-            print(f"Warning: STT processor not available: {e}")
-            stt_processor = None
-        
-        print("✅ All backend components initialized successfully")
-        
+        print("✅ Vector store initialized")
     except Exception as e:
-        print(f"❌ Failed to initialize backend components: {e}")
-        raise
+        print(f"⚠️ Failed to initialize vector store: {e}")
+        print(traceback.format_exc())
+        vector_store = None
+    
+    # Initialize query processor (depends on embedding and vector store)
+    if embedding_manager and vector_store:
+        try:
+            print("Initializing query processor...")
+            query_processor = QueryProcessor(
+                embedding_manager,
+                vector_store,
+                {
+                    'similarity_threshold': 0.5,
+                    'max_results': 10,
+                    'enable_cross_modal': True
+                }
+            )
+            print("✅ Query processor initialized")
+        except Exception as e:
+            print(f"⚠️ Failed to initialize query processor: {e}")
+            print(traceback.format_exc())
+            query_processor = None
+    else:
+        print("⚠️ Skipping query processor (missing dependencies)")
+        query_processor = None
+    
+    # Initialize LLM generator
+    try:
+        print("Initializing LLM generator...")
+        llm_generator = LMStudioGenerator(LM_STUDIO_CONFIG)
+        print("✅ LLM generator initialized")
+    except Exception as e:
+        print(f"⚠️ Failed to initialize LLM generator: {e}")
+        print(traceback.format_exc())
+        llm_generator = None
+    
+    # Initialize citation generator
+    try:
+        print("Initializing citation generator...")
+        citation_generator = CitationGenerator()
+        print("✅ Citation generator initialized")
+    except Exception as e:
+        print(f"⚠️ Failed to initialize citation generator: {e}")
+        print(traceback.format_exc())
+        citation_generator = None
+    
+    # Initialize feedback system
+    try:
+        print("Initializing feedback system...")
+        feedback_system = FeedbackSystem()
+        print("✅ Feedback system initialized")
+    except Exception as e:
+        print(f"⚠️ Failed to initialize feedback system: {e}")
+        print(traceback.format_exc())
+        feedback_system = None
+    
+    # Initialize knowledge graph manager
+    try:
+        print("Initializing knowledge graph manager...")
+        kg_manager = KnowledgeGraphManager()
+        print("✅ Knowledge graph manager initialized")
+    except Exception as e:
+        print(f"⚠️ Failed to initialize knowledge graph manager: {e}")
+        print(traceback.format_exc())
+        kg_manager = None
+    
+    # Initialize metrics collector
+    try:
+        print("Initializing metrics collector...")
+        metrics_collector = MetricsCollector()
+        print("✅ Metrics collector initialized")
+    except Exception as e:
+        print(f"⚠️ Failed to initialize metrics collector: {e}")
+        print(traceback.format_exc())
+        metrics_collector = None
+    
+    # Initialize speech-to-text processor (optional)
+    try:
+        print("Initializing speech-to-text processor...")
+        stt_processor = SpeechToTextProcessor()
+        print("✅ Speech-to-text processor initialized")
+    except Exception as e:
+        print(f"⚠️ Speech-to-text processor not available: {e}")
+        stt_processor = None
+    
+    # Summary
+    initialized = sum([
+        ingestion_manager is not None,
+        embedding_manager is not None,
+        vector_store is not None,
+        query_processor is not None,
+        llm_generator is not None,
+        citation_generator is not None,
+        feedback_system is not None,
+        kg_manager is not None,
+    ])
+    
+    print(f"\n✅ Backend API initialized ({initialized}/8 core components)")
+    print("📝 API documentation available at: http://localhost:8000/docs")
+    print("🔍 OpenAPI schema available at: http://localhost:8000/openapi.json")
 
 
 @app.on_event("shutdown")
@@ -228,7 +309,7 @@ async def test_endpoint():
     return {
         "message": "API is working",
         "timestamp": datetime.utcnow().isoformat(),
-        "backend_url": str(API_URL) if 'API_URL' in globals() else "unknown"
+        "status": "ok"
     }
 
 
@@ -561,25 +642,35 @@ async def get_usage_stats(time_range_hours: int = 24):
 async def get_security_events(limit: int = 50):
     """Get security events and anomalies"""
     if not kg_manager:
-        return {"events": [], "anomalies": []}
+        return {"events": [], "anomalies": [], "total": 0}
     
-    # Get anomalies from knowledge graph
-    anomalies = kg_manager.detect_anomalies()
-    
-    return {
-        "events": [],
-        "anomalies": [
-            {
-                "anomaly_id": a.get('anomaly_id', ''),
-                "type": a.get('type', ''),
-                "severity": a.get('severity', ''),
-                "description": a.get('description', ''),
-                "timestamp": a.get('timestamp', '')
-            }
-            for a in anomalies[:limit]
-        ],
-        "total": len(anomalies)
-    }
+    try:
+        # Get anomalies from knowledge graph
+        anomalies = kg_manager.detect_anomalies()
+        
+        # Ensure anomalies is a list
+        if not isinstance(anomalies, list):
+            anomalies = []
+        
+        return {
+            "events": [],
+            "anomalies": [
+                {
+                    "anomaly_id": a.get('anomaly_id', '') if isinstance(a, dict) else str(a),
+                    "type": a.get('type', '') if isinstance(a, dict) else 'unknown',
+                    "severity": a.get('severity', '') if isinstance(a, dict) else 'low',
+                    "description": a.get('description', '') if isinstance(a, dict) else str(a),
+                    "timestamp": a.get('timestamp', '') if isinstance(a, dict) else ''
+                }
+                for a in anomalies[:limit]
+            ],
+            "total": len(anomalies)
+        }
+    except Exception as e:
+        print(f"Error getting security events: {e}")
+        import traceback
+        traceback.print_exc()
+        return {"events": [], "anomalies": [], "total": 0, "error": str(e)}
 
 
 @app.get("/api/knowledge-graph")
@@ -718,14 +809,16 @@ async def get_audit_logs(limit: int = 50):
 
 
 @app.get("/api/security/events")
-async def get_security_events(limit: int = 50):
+async def get_security_events_endpoint(limit: int = 50):
     """Get security events"""
+    # Reuse the analytics security endpoint
     return await get_security_events(limit)
 
 
 @app.get("/api/security/anomalies")
-async def get_anomalies(limit: int = 50):
+async def get_anomalies_endpoint(limit: int = 50):
     """Get anomaly detection data"""
+    # Reuse the analytics security endpoint
     return await get_security_events(limit)
 
 
