@@ -47,7 +47,10 @@ from config import (
 app = FastAPI(
     title="NeuraX RAG API",
     description="RESTful API for NeuraX Multimodal RAG System",
-    version="2.0.0"
+    version="2.0.0",
+    docs_url="/docs",
+    redoc_url="/redoc",
+    openapi_url="/openapi.json"
 )
 
 # CORS configuration for Next.js frontend
@@ -251,11 +254,25 @@ class QueryResponse(BaseModel):
     query_id: str
     query: str
     response_text: Optional[str] = None
-    results: List[Dict[str, Any]]
-    citations: List[Dict[str, Any]]
+    results: List[Dict[str, Any]] = []
+    citations: List[Dict[str, Any]] = []
     processing_time: float
     total_results: int
     model_used: Optional[str] = None
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "query_id": "query_123",
+                "query": "What is RAG?",
+                "response_text": "RAG is...",
+                "results": [],
+                "citations": [],
+                "processing_time": 1.5,
+                "total_results": 0,
+                "model_used": "gemma-3n"
+            }
+        }
 
 
 class FileUploadResponse(BaseModel):
@@ -265,6 +282,18 @@ class FileUploadResponse(BaseModel):
     status: str
     processing_time: float
     message: str
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "file_id": "doc_123",
+                "filename": "example.pdf",
+                "file_type": "pdf",
+                "status": "success",
+                "processing_time": 2.5,
+                "message": "File processed and indexed successfully"
+            }
+        }
 
 
 class FeedbackRequest(BaseModel):
@@ -811,15 +840,38 @@ async def get_audit_logs(limit: int = 50):
 @app.get("/api/security/events")
 async def get_security_events_endpoint(limit: int = 50):
     """Get security events"""
-    # Reuse the analytics security endpoint
-    return await get_security_events(limit)
+    # Reuse the analytics security endpoint logic
+    if not kg_manager:
+        return {"events": [], "anomalies": [], "total": 0}
+    
+    try:
+        anomalies = kg_manager.detect_anomalies()
+        if not isinstance(anomalies, list):
+            anomalies = []
+        
+        return {
+            "events": [],
+            "anomalies": [
+                {
+                    "anomaly_id": a.get('anomaly_id', '') if isinstance(a, dict) else str(a),
+                    "type": a.get('type', '') if isinstance(a, dict) else 'unknown',
+                    "severity": a.get('severity', '') if isinstance(a, dict) else 'low',
+                    "description": a.get('description', '') if isinstance(a, dict) else str(a),
+                    "timestamp": a.get('timestamp', '') if isinstance(a, dict) else ''
+                }
+                for a in anomalies[:limit]
+            ],
+            "total": len(anomalies)
+        }
+    except Exception as e:
+        return {"events": [], "anomalies": [], "total": 0, "error": str(e)}
 
 
 @app.get("/api/security/anomalies")
 async def get_anomalies_endpoint(limit: int = 50):
     """Get anomaly detection data"""
-    # Reuse the analytics security endpoint
-    return await get_security_events(limit)
+    # Same as security events
+    return await get_security_events_endpoint(limit)
 
 
 # ==================== Main Entry Point ====================
