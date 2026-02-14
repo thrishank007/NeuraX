@@ -1,5 +1,5 @@
 """
-Performance benchmarking and optimization for SecureInsight
+Performance benchmarking and optimization for NeuraX
 """
 import time
 import statistics

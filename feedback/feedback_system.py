@@ -1,5 +1,5 @@
 """
-Feedback system implementation for SecureInsight.
+Feedback system implementation for NeuraX.
 
 Provides local feedback collection, storage, and anonymized export capabilities
 for continuous system improvement and performance tracking.

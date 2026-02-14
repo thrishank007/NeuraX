@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Automated dependency installation script for SecureInsight RAG system
+Automated dependency installation script for NeuraX RAG system
 """
 
 import subprocess
@@ -195,7 +195,7 @@ def setup_logging():
         logger.remove()
         
         # Add file handler
-        log_file = LOGS_DIR / "secureinsight.log"
+        log_file = LOGS_DIR / "neurax.log"
         logger.add(
             log_file,
             level=LOGGING_CONFIG["level"],
@@ -222,7 +222,7 @@ def setup_logging():
 
 def main():
     """Main installation function"""
-    print("🚀 SecureInsight RAG System - Dependency Installation")
+    print("🚀 NeuraX RAG System - Dependency Installation")
     print("=" * 60)
     
     # Check Python version

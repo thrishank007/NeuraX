@@ -1,5 +1,5 @@
 """
-Gradio-based chat interface for SecureInsight multimodal RAG system
+Gradio-based chat interface for NeuraX multimodal RAG system
 """
 import gradio as gr
 import asyncio
@@ -26,8 +26,8 @@ from config import (
 )
 
 
-class SecureInsightGradioApp:
-    """Main Gradio application for SecureInsight"""
+class NeuraXGradioApp:
+    """Main Gradio application for NeuraX"""
     
     def __init__(self):
         """Initialize the Gradio application"""
@@ -62,7 +62,7 @@ class SecureInsightGradioApp:
                                PROCESSING_CONFIG['supported_image_formats'] + \
                                PROCESSING_CONFIG['supported_audio_formats']
         
-        logger.info("SecureInsight Gradio app initialized")
+        logger.info("NeuraX Gradio app initialized")
     
     def _initialize_components(self):
         """Lazy initialization of heavy components"""
@@ -940,7 +940,7 @@ class SecureInsightGradioApp:
         """Create the main Gradio interface"""
         
         with gr.Blocks(
-            title="SecureInsight - Multimodal RAG System",
+            title="NeuraX - Multimodal RAG System",
             theme=gr.themes.Soft(),
             css="""
             .gradio-container {
@@ -978,7 +978,7 @@ class SecureInsightGradioApp:
             # Header
             gr.Markdown(
                 """
-                # 🔒 SecureInsight - Multimodal RAG System
+                # 🔒 NeuraX - Multimodal RAG System
                 
                 Upload and process documents, images, and audio files for secure offline analysis.
                 Supports PDFs, DOCs, images (JPG, PNG, etc.), and audio files (WAV, MP3, etc.).
@@ -1493,7 +1493,7 @@ def create_gradio_interface() -> gr.Blocks:
     Returns:
         Configured Gradio Blocks interface
     """
-    app = SecureInsightGradioApp()
+    app = NeuraXGradioApp()
     return app.create_interface()
 
 
