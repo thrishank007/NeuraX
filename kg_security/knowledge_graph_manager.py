@@ -1,5 +1,5 @@
 """
-Knowledge Graph Manager for SecureInsight
+Knowledge Graph Manager for NeuraX
 
 Implements NetworkX-based knowledge graph construction, entity linking,
 and visualization export for security analysis and dashboard integration.

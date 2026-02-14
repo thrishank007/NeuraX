@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Main launcher for SecureInsight Multimodal RAG System
+Main launcher for NeuraX Multimodal RAG System
 
 This launcher orchestrates all system components including:
 - Ingestion processors (document, image, audio, notes)
@@ -36,12 +36,12 @@ from config import (
 )
 
 
-class SecureInsightLauncher:
-    """Main launcher for SecureInsight system"""
+class NeuraXLauncher:
+    """Main launcher for NeuraX system"""
     
     def __init__(self):
         self.error_handler = ErrorHandler()
-        self.logger = get_logger("SecureInsightLauncher")
+        self.logger = get_logger("NeuraXLauncher")
         self.gradio_process = None
         self.streamlit_process = None
         self.shutdown_event = threading.Event()
@@ -84,7 +84,7 @@ class SecureInsightLauncher:
         signal.signal(signal.SIGINT, self._signal_handler)
         signal.signal(signal.SIGTERM, self._signal_handler)
         
-        self.logger.info("SecureInsight Launcher initialized")
+        self.logger.info("NeuraX Launcher initialized")
     
     def _signal_handler(self, signum, frame):
         """Handle shutdown signals gracefully"""
@@ -459,10 +459,10 @@ class SecureInsightLauncher:
             self.logger.info("Launching Gradio interface...")
             
             # Import the Gradio app class
-            from ui.gradio_app import SecureInsightGradioApp
-            
+from ui.gradio_app import NeuraXGradioApp
+
             # Create app instance and inject components
-            gradio_app = SecureInsightGradioApp()
+            gradio_app = NeuraXGradioApp()
             
             # Inject initialized components
             gradio_app.embedding_manager = self.embedding_manager
@@ -518,7 +518,7 @@ class SecureInsightLauncher:
             
             # Set environment variables for component sharing
             env = os.environ.copy()
-            env['SECUREINSIGHT_LAUNCHER_PID'] = str(os.getpid())
+            env['NEURAX_LAUNCHER_PID'] = str(os.getpid())
             
             # Launch Streamlit in a separate process
             streamlit_cmd = [
@@ -577,7 +577,7 @@ class SecureInsightLauncher:
         self.logger.info("Starting interactive mode...")
         
         print("\n" + "="*60)
-        print("SecureInsight Multimodal RAG System")
+        print("NeuraX Multimodal RAG System")
         print("="*60)
         print(f"Gradio Interface: http://{GRADIO_CONFIG['server_name']}:{GRADIO_CONFIG['server_port']}")
         print(f"Streamlit Dashboard: http://{STREAMLIT_CONFIG['server_address']}:{STREAMLIT_CONFIG['server_port']}")
@@ -593,7 +593,7 @@ class SecureInsightLauncher:
         
         while not self.shutdown_event.is_set():
             try:
-                command = input("\nSecureInsight> ").strip().lower()
+                command = input("\nNeuraX> ").strip().lower()
                 
                 if command == 'quit' or command == 'exit':
                     break
@@ -621,7 +621,7 @@ class SecureInsightLauncher:
     
     def _show_help(self):
         """Show help information"""
-        print("\nSecureInsight Commands:")
+        print("\nNeuraX Commands:")
         print("  help      - Show this help message")
         print("  status    - Show system status and component health")
         print("  test      - Run comprehensive system tests (offline + integration + health)")
@@ -1091,7 +1091,7 @@ class SecureInsightLauncher:
     
     def shutdown(self):
         """Shutdown all components gracefully"""
-        self.logger.info("Shutting down SecureInsight...")
+        self.logger.info("Shutting down NeuraX...")
         
         # Shutdown Streamlit process
         if hasattr(self, 'streamlit_process') and self.streamlit_process and self.streamlit_process.poll() is None:
@@ -1138,7 +1138,7 @@ class SecureInsightLauncher:
         # Update system status
         self.system_health['overall_status'] = 'shutdown'
         
-        self.logger.info("✅ SecureInsight shutdown completed gracefully")
+        self.logger.info("✅ NeuraX shutdown completed gracefully")
     
     def run(self, mode: str = 'interactive', launch_gradio: bool = True, launch_streamlit: bool = True) -> int:
         """
@@ -1205,7 +1205,7 @@ class SecureInsightLauncher:
 
 def main():
     """Main entry point"""
-    parser = argparse.ArgumentParser(description="SecureInsight Multimodal RAG System")
+    parser = argparse.ArgumentParser(description="NeuraX Multimodal RAG System")
     parser.add_argument('--mode', choices=['interactive', 'gradio_only', 'streamlit_only', 'headless'],
                        default='interactive', help='Run mode')
     parser.add_argument('--no-gradio', action='store_true', help='Disable Gradio interface')
@@ -1221,7 +1221,7 @@ def main():
         return 1
     
     # Create launcher
-    launcher = SecureInsightLauncher()
+    launcher = NeuraXLauncher()
     
     # Handle validate-only mode
     if args.validate_only:

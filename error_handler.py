@@ -1,5 +1,5 @@
 """
-Comprehensive error handling system for SecureInsight RAG
+Comprehensive error handling system for NeuraX RAG
 """
 import torch
 import psutil

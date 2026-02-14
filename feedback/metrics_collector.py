@@ -1,5 +1,5 @@
 """
-Metrics collector implementation with RAGAS integration for SecureInsight.
+Metrics collector implementation with RAGAS integration for NeuraX.
 
 Provides comprehensive evaluation metrics including RAGAS metrics for RAG system
 evaluation, processing time tracking, and efficiency benchmarking.

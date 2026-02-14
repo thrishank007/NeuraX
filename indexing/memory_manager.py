@@ -1,5 +1,5 @@
 """
-Memory management and optimization utilities for SecureInsight
+Memory management and optimization utilities for NeuraX
 """
 import gc
 import mmap

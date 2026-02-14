@@ -1,5 +1,5 @@
 """
-Streamlit monitoring dashboard for SecureInsight
+Streamlit monitoring dashboard for NeuraX
 
 Provides comprehensive system monitoring including:
 - System performance metrics and health monitoring
@@ -23,7 +23,7 @@ import psutil
 import threading
 from loguru import logger
 
-# Import SecureInsight components
+# Import NeuraX components
 from config import (
     STREAMLIT_CONFIG, KG_CONFIG, FEEDBACK_CONFIG, 
     VECTOR_DB_DIR, FEEDBACK_DIR, LOGS_DIR
@@ -141,7 +141,7 @@ class DashboardApp:
         self._initialize_components()
     
     def _initialize_components(self):
-        """Initialize SecureInsight components"""
+        """Initialize NeuraX components"""
         try:
             # Initialize feedback system
             self.feedback_system = FeedbackSystem(FEEDBACK_DIR)
@@ -149,7 +149,7 @@ class DashboardApp:
             # Initialize vector store
             self.vector_store = VectorStore(
                 persist_directory=str(VECTOR_DB_DIR),
-                collection_name="secureinsight_collection"
+                collection_name="neurax_collection"
             )
             
             # Initialize knowledge graph manager
@@ -164,7 +164,7 @@ class DashboardApp:
     def run(self):
         """Run the Streamlit dashboard"""
         st.set_page_config(
-            page_title="SecureInsight Dashboard",
+            page_title="NeuraX Dashboard",
             page_icon="🔍",
             layout="wide",
             initial_sidebar_state="expanded"
@@ -176,7 +176,7 @@ class DashboardApp:
             st.session_state.metrics_started = True
         
         # Sidebar navigation
-        st.sidebar.title("🔍 SecureInsight Dashboard")
+        st.sidebar.title("🔍 NeuraX Dashboard")
         page = st.sidebar.selectbox(
             "Navigate to:",
             ["System Metrics", "Knowledge Graph", "Feedback Analysis", "System Health"]

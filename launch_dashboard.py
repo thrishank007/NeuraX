@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-Launch script for SecureInsight Streamlit Dashboard
+Launch script for NeuraX Streamlit Dashboard
 
-This script launches the Streamlit monitoring dashboard for SecureInsight.
+This script launches the Streamlit monitoring dashboard for NeuraX.
 Run with: python launch_dashboard.py
 """
 
@@ -20,7 +20,7 @@ def main():
         print(f"Error: Dashboard script not found at {dashboard_path}")
         sys.exit(1)
     
-    print("🚀 Launching SecureInsight Monitoring Dashboard...")
+    print("🚀 Launching NeuraX Monitoring Dashboard...")
     print("📊 Dashboard will be available at: http://localhost:8501")
     print("🔄 Press Ctrl+C to stop the dashboard")
     print("-" * 50)

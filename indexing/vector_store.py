@@ -19,7 +19,7 @@ from .performance_benchmarker import PerformanceBenchmarker
 class VectorStore:
     """Enhanced vector store with multimodal search capabilities and memory optimization"""
     
-    def __init__(self, persist_directory: str, collection_name: str = "secureinsight_collection"):
+    def __init__(self, persist_directory: str, collection_name: str = "neurax_collection"):
         self.persist_directory = Path(persist_directory)
         self.collection_name = collection_name
         self.client = None

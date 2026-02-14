@@ -1,5 +1,5 @@
 """
-Configuration settings for SecureInsight RAG system
+Configuration settings for NeuraX RAG system
 """
 import os
 from pathlib import Path
@@ -90,7 +90,7 @@ WHISPER_CONFIG = {
 # Vector database settings
 CHROMA_CONFIG = {
     "persist_directory": str(VECTOR_DB_DIR),
-    "collection_name": "secureinsight_with_docs",
+    "collection_name": "neurax_with_docs",
     "embedding_function": None,  # Will be set by EmbeddingManager
     "distance_function": "cosine",
     "hnsw_space": "cosine",
