@@ -1,4 +1,25 @@
+# Markdown drafts — allow product, design, and migration docs
 *.md
+!README.md
+!PRODUCT.md
+!DESIGN.md
+!docs/**/*.md
+
 .kiro
 venv
 __pycache__
+node_modules
+frontend/node_modules
+frontend/.next
+frontend/test-results
+frontend/playwright-report
+*.pyc
+.pytest_cache
+data/uploads/**
+!data/uploads/.gitkeep
+cache/
+logs/
+*.log
+.env
+.env.local
+frontend/.env.local
