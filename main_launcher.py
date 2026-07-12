@@ -459,7 +459,7 @@ class NeuraXLauncher:
             self.logger.info("Launching Gradio interface...")
             
             # Import the Gradio app class
-from ui.gradio_app import NeuraXGradioApp
+            from ui.gradio_app import NeuraXGradioApp
 
             # Create app instance and inject components
             gradio_app = NeuraXGradioApp()
