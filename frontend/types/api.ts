@@ -100,6 +100,8 @@ export type ChatMessage = {
   id: string;
   role: "user" | "assistant" | "system";
   content: string;
+  /** Original user query (on assistant messages) for feedback */
+  query?: string;
   citations?: CitationItem[];
   sources?: SearchResultItem[];
   confidence?: number;

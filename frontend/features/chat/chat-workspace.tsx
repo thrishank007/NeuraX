@@ -8,6 +8,9 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { FeedbackForm } from "@/features/chat/feedback-form";
+import { pushQueryHistory } from "@/lib/query-history";
+
 
 function uid() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -60,6 +63,7 @@ export function ChatWorkspace() {
         id: assistantId,
         role: "assistant",
         content: "",
+        query: text,
         status: "streaming",
       },
     ]);
@@ -140,6 +144,7 @@ export function ChatWorkspace() {
                 content:
                   responseText ||
                   "No response returned. Check LM Studio and indexed documents.",
+                query: text,
                 citations,
                 sources,
                 confidence,
@@ -152,6 +157,12 @@ export function ChatWorkspace() {
       );
       setSelectedSources(sources);
       setSelectedCitations(citations);
+      pushQueryHistory({
+        query: text,
+        type: "chat",
+        results_count: sources.length,
+        processing_time,
+      });
       try {
         sessionStorage.setItem(
           "neurax-last-sources",
@@ -243,7 +254,9 @@ export function ChatWorkspace() {
               <p className="font-medium text-text">Ask about your index</p>
               <p className="mt-1">
                 Index documents first if the collection is empty. Answers cite
-                retrieved sources when context is available.
+                retrieved sources when context is available. For search-only
+                (image / voice / multimodal without generation), use the Search
+                page.
               </p>
             </div>
           )}
@@ -304,6 +317,12 @@ export function ChatWorkspace() {
                   ))}
                 </ul>
               )}
+              {m.role === "assistant" &&
+                m.status === "done" &&
+                m.query &&
+                m.content && (
+                  <FeedbackForm query={m.query} response={m.content} />
+                )}
             </article>
           ))}
           <div ref={endRef} />

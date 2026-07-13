@@ -8,6 +8,7 @@ import {
   MessageSquare,
   PanelLeftClose,
   PanelLeftOpen,
+  Search,
   Settings,
   Library,
 } from "lucide-react";
@@ -18,6 +19,7 @@ import { Button } from "@/components/ui/button";
 
 const NAV = [
   { href: "/chat", label: "Chat", icon: MessageSquare },
+  { href: "/search", label: "Search", icon: Search },
   { href: "/documents", label: "Documents", icon: FileText },
   { href: "/sources", label: "Sources", icon: Library },
   { href: "/graph", label: "Knowledge Graph", icon: GitBranch },

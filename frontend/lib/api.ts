@@ -126,22 +126,31 @@ export const api = {
       { method: "POST", signal },
     ),
 
-  searchText: async (
+  search: async (
     params: {
-      query: string;
+      query?: string;
+      modality?: "text" | "image" | "voice" | "multimodal";
       similarity_threshold?: number;
       k?: number;
+      image?: File | null;
+      audio?: File | null;
     },
     signal?: AbortSignal,
   ) => {
     const form = new FormData();
-    form.append("query", params.query);
-    form.append("modality", "text");
+    form.append("query", params.query ?? "");
+    form.append("modality", params.modality ?? "text");
     if (params.similarity_threshold != null) {
       form.append("similarity_threshold", String(params.similarity_threshold));
     }
     if (params.k != null) {
       form.append("k", String(params.k));
+    }
+    if (params.image) {
+      form.append("image", params.image);
+    }
+    if (params.audio) {
+      form.append("audio", params.audio);
     }
     return request<{
       query: string;
@@ -150,6 +159,7 @@ export const api = {
       total_results: number;
       similarity_threshold: number;
       processing_time: number;
+      transcription?: string | null;
     }>("/api/search", { method: "POST", body: form, signal });
   },
 

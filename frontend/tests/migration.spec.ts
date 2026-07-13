@@ -114,4 +114,25 @@ test.describe("NeuraX migration UI", () => {
       page.getByRole("heading", { name: "Sources", exact: true }),
     ).toBeVisible();
   });
+
+  test("search page supports modality tabs", async ({ page }) => {
+    await page.goto("/search");
+    await expect(
+      page.getByRole("heading", { name: "Search", exact: true }),
+    ).toBeVisible();
+    await expect(page.getByRole("tab", { name: "Text" })).toBeVisible();
+    await expect(page.getByRole("tab", { name: "Image" })).toBeVisible();
+    await expect(page.getByRole("tab", { name: "Voice" })).toBeVisible();
+    await expect(page.getByRole("tab", { name: "Multimodal" })).toBeVisible();
+    await page.getByRole("tab", { name: "Image" }).click();
+    await expect(page.getByLabel("Upload image for search")).toBeAttached();
+    await page.getByRole("tab", { name: "Voice" }).click();
+    await expect(page.getByLabel("Upload audio for voice search")).toBeAttached();
+  });
+
+  test("settings includes help instructions", async ({ page }) => {
+    await page.goto("/settings");
+    await expect(page.getByText(/Help & instructions|Help/i).first()).toBeVisible();
+  });
 });
+

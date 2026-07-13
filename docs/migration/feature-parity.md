@@ -15,16 +15,20 @@ Status values: **complete** | **intentionally changed** | **blocked** | **not ap
 | Document listing | Session-only | intentionally changed | Documents page | Chroma-backed list |
 | Delete indexed docs | No UI | complete | DELETE + confirm | VectorStore.delete |
 | Text search / chat | Yes | complete | Chat + `/api/chat` | Same QueryProcessor |
+| Multimodal search UI | Yes | complete | Search page | text / image / voice / multimodal |
+| Search without generation | Yes | complete | Search page | Gradio Query tab parity |
+| Query history | Yes | complete | Search sidebar + session | Last 20 entries |
+| Feedback rating form | Yes | complete | Chat after answer | `POST /api/feedback` |
+| Help / instructions | Yes | complete | Settings accordion | Formats + troubleshooting |
 | Multimodal search API | Yes | complete | `/api/search` | Form modalities |
-| Similarity threshold | Yes | complete | Chat controls | Same semantics |
+| Similarity threshold | Yes | complete | Chat + Search controls | Same semantics |
 | Citations | Yes | complete | Sources panel | CitationGenerator |
 | System / LM status | Partial | complete | Status bar + Settings | Explicit probes |
 | Knowledge graph | Streamlit | complete (thin) | `/api/graph` | Optional export |
 | Gradio UI | Yes | **removed** | — | `ui/gradio_app.py` deleted |
 | Dual-run fallback | Planned | **not applicable** | — | Next.js is sole product UI |
 
-## Gaps (product, not fallback)
+## Remaining non-Gradio gaps
 
-- Multimodal **composer attach** (image/voice) is API-ready; text chat is the primary UI path  
-- Feedback form UI not ported (API `POST /api/feedback` exists)  
-- Token-level LM streaming not enabled (SSE full-message events)
+- Token-level LM streaming not enabled (SSE full-message events)  
+- Streamlit analytics/metrics dashboards not ported (ops, not Gradio product UI)

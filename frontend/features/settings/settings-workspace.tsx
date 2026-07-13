@@ -5,6 +5,7 @@ import { api, ApiClientError } from "@/lib/api";
 import type { ModelsStatus, SystemStatus } from "@/types/api";
 import { getApiBaseUrl } from "@/lib/env";
 import { StatusChip, mapSystemKind } from "@/components/status/status-chip";
+import { HelpPanel } from "@/features/help/help-panel";
 
 export function SettingsWorkspace() {
   const [system, setSystem] = useState<SystemStatus | null>(null);
@@ -110,10 +111,13 @@ export function SettingsWorkspace() {
       <section className="rounded-lg border border-border bg-surface p-3 text-xs text-muted">
         <p>
           Chat similarity threshold and max context documents are controlled on
-          the Chat page (matching Gradio sliders). Retrieval defaults still come
-          from the Python <code className="font-mono">SEARCH_CONFIG</code>.
+          the Chat page. Multimodal retrieval (text, image, voice) is on the
+          Search page. Retrieval defaults come from Python{" "}
+          <code className="font-mono">SEARCH_CONFIG</code>.
         </p>
       </section>
+
+      <HelpPanel defaultOpen />
     </div>
   );
 }
