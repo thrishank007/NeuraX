@@ -41,14 +41,31 @@ NeuraX is a production-ready offline multimodal Retrieval-Augmented Generation (
 
 ## 🏗️ Architecture
 
+```text
+Next.js frontend (frontend/, :3000)
+    ↓ HTTP / SSE
+FastAPI service layer (backend/, :8000)
+    ↓
+Existing Python domain modules (ingestion, indexing, retrieval, generation)
+    ↓
+ChromaDB · embeddings · Whisper · CLIP · LM Studio
+```
+
+Gradio (`:7860`) and Streamlit (`:8501`) remain available during the UI migration.
+
 ### Core Components
 - **LM Studio Integration**: Local LLM server for multimodal and reasoning tasks
 - **ChromaDB**: Persistent vector database for semantic search
 - **CLIP Embeddings**: Visual-text cross-modal understanding
 - **Whisper STT**: Speech-to-text for audio processing
 - **NetworkX**: Knowledge graph with security monitoring
-- **Gradio UI**: Modern web interface for end users
+- **FastAPI**: Thin HTTP API over domain modules
+- **Next.js UI**: Production workspace (Chat, Documents, Sources, Graph, Settings)
+- **Gradio UI**: Legacy interface (kept until parity sign-off)
 - **Streamlit Dashboard**: Analytics and system monitoring
+
+### Migration status
+See [docs/migration/feature-parity.md](docs/migration/feature-parity.md). Work lives on branch `feat/nextjs-frontend-migration`. Gradio is **not** removed yet.
 
 ## 🛠️ System Requirements
 
@@ -83,9 +100,38 @@ python install_dependencies.py
 # Setup LM Studio integration
 python migrate_to_lmstudio.py
 
-# Launch the system
+# Launch legacy Gradio UI
 python main_launcher.py
 ```
+
+### Next.js + FastAPI (recommended UI path)
+
+```bash
+# Backend (repo root, venv active)
+uvicorn backend.main:app --reload --host 127.0.0.1 --port 8000
+
+# Frontend
+cd frontend
+cp .env.local.example .env.local   # Windows: copy .env.local.example .env.local
+npm install
+npm run dev
+```
+
+Or start both (Windows):
+
+```powershell
+pwsh scripts/dev.ps1
+```
+
+| Surface | URL |
+|---|---|
+| Next.js workspace | http://127.0.0.1:3000 |
+| FastAPI | http://127.0.0.1:8000 |
+| API docs | http://127.0.0.1:8000/docs |
+| Gradio (legacy) | http://127.0.0.1:7860 |
+| Streamlit | http://127.0.0.1:8501 |
+
+Environment templates: [`.env.example`](.env.example), [`frontend/.env.local.example`](frontend/.env.local.example).
 
 ### Option 2: Manual Installation
 ```bash
@@ -213,29 +259,69 @@ NeuraX/
 │   ├── metrics_collector.py   # Performance metrics
 │   └── 📁 exports/            # Feedback data exports
 │
-├── 📁 ui/                     # User interfaces
-│   ├── gradio_app.py          # Main web interface
-│   ├── streamlit_dashboard.py # Analytics dashboard
-│   └── demo_gradio_app.py     # Demo interface
+├── 📁 backend/                # FastAPI thin service layer
+│   ├── main.py                # App factory, CORS, lifespan
+│   ├── api/routes/            # HTTP endpoints
+│   ├── services/              # Orchestration (mirrors Gradio)
+│   └── tests/                 # API tests
 │
-├── 📁 tests/                  # Comprehensive test suite
-│   ├── test_*.py              # Unit and integration tests
-│   └── conftest.py            # Test configuration
+├── 📁 frontend/               # Next.js App Router workspace
+│   ├── app/                   # Routes (chat, documents, …)
+│   ├── features/              # Feature UI
+│   ├── components/            # Shared UI
+│   └── tests/                 # Playwright migration tests
 │
+├── 📁 ui/                     # Legacy interfaces
+│   ├── gradio_app.py          # Gradio UI (still supported)
+│   └── streamlit_dashboard.py # Analytics dashboard
+│
+├── 📁 docs/migration/         # Baseline, architecture, parity
 ├── 📁 models/                 # Local model cache (LM Studio managed)
-├── 📁 data/                   # Input data and samples
+├── 📁 data/                   # Input data and uploads
 ├── 📁 vector_db/              # ChromaDB persistent storage
 ├── 📁 cache/                  # Embedding and processing cache
 ├── 📁 logs/                   # System logs and error reports
 │
-├── 🔧 config.py               # Central configuration
-├── 🚀 main_launcher.py        # Application orchestrator
+├── 🔧 config.py               # Central domain configuration
+├── 🚀 main_launcher.py        # Gradio/Streamlit orchestrator
 ├── 📋 requirements.txt        # Python dependencies
 ├── 🛠️ install_dependencies.py # Automated setup script
 ├── 📦 build_executables.py    # Portable build script
-├── 🔄 migrate_to_lmstudio.py  # LM Studio migration tool
-└── 🧪 test_*.py              # Verification and test scripts
+├── PRODUCT.md / DESIGN.md     # Product and design direction
+└── scripts/dev.ps1            # API + frontend dev launcher
 ```
+
+## 🧪 Tests
+
+```bash
+# Backend API
+pytest backend/tests -q
+
+# Frontend
+cd frontend
+npm run typecheck
+npm run build
+npx playwright install chromium   # once
+npm run test                      # requires API + frontend running
+```
+
+## 🔌 Offline deployment notes
+
+- Install Python deps, Node deps, embedding models, Whisper, and LM Studio models while online.
+- Run with no required external APIs: frontend → local FastAPI → local Chroma/LM Studio.
+- Bind hosts explicitly for trusted LAN; keep `NEURAX_CORS_ORIGINS` tight (no `*`).
+- Gradio remains a fallback: `python main_launcher.py --mode gradio_only`.
+
+## 🩺 Troubleshooting
+
+| Symptom | Check |
+|---|---|
+| Status bar: Backend unavailable | `uvicorn backend.main:app --host 127.0.0.1 --port 8000` |
+| LM Studio unavailable | Local Server on port 1234; load a model |
+| Empty search / weak answers | Index documents first; lower similarity threshold |
+| Upload rejected | Extension allowlist and max size in Settings |
+| CORS errors in browser | `NEURAX_CORS_ORIGINS` includes `http://127.0.0.1:3000` |
+
 
 ## 🔧 Configuration
 

@@ -1,0 +1,72 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: #f4f1ea;
+  --surface: #fffcf7;
+  --surface-2: #ebe6dc;
+  --border: #d4cdbf;
+  --text: #1c1915;
+  --text-muted: #5c564c;
+  --accent: #0f6e56;
+  --accent-hover: #0b5a46;
+  --accent-subtle: #d8ede6;
+  --success: #0f6e56;
+  --warning: #9a6700;
+  --danger: #b42318;
+  --info: #175cd3;
+  --font-sans: "IBM Plex Sans", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+}
+
+.dark {
+  --bg: #121410;
+  --surface: #1a1d18;
+  --surface-2: #242820;
+  --border: #33382e;
+  --text: #ece7dc;
+  --text-muted: #a39e91;
+  --accent: #3d9b7a;
+  --accent-hover: #4fb08c;
+  --accent-subtle: #1e332b;
+  --success: #3d9b7a;
+  --warning: #d4a017;
+  --danger: #f97066;
+  --info: #84adff;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+*:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Scrollbars — restrained */
+.scroll-panel {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
