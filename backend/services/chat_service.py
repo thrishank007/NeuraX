@@ -1,4 +1,4 @@
-"""Chat: retrieve + generate + cite — mirrors Gradio generate_response_handler."""
+"""Chat: retrieve + generate + cite using domain generators."""
 from __future__ import annotations
 
 import time

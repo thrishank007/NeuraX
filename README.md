@@ -51,7 +51,7 @@ Existing Python domain modules (ingestion, indexing, retrieval, generation)
 ChromaDB · embeddings · Whisper · CLIP · LM Studio
 ```
 
-Gradio (`:7860`) and Streamlit (`:8501`) remain available during the UI migration.
+**Product UI is Next.js only.** Streamlit (`:8501`) is optional analytics, not the main interface.
 
 ### Core Components
 - **LM Studio Integration**: Local LLM server for multimodal and reasoning tasks
@@ -60,12 +60,8 @@ Gradio (`:7860`) and Streamlit (`:8501`) remain available during the UI migratio
 - **Whisper STT**: Speech-to-text for audio processing
 - **NetworkX**: Knowledge graph with security monitoring
 - **FastAPI**: Thin HTTP API over domain modules
-- **Next.js UI**: Production workspace (Chat, Documents, Sources, Graph, Settings)
-- **Gradio UI**: Legacy interface (kept until parity sign-off)
-- **Streamlit Dashboard**: Analytics and system monitoring
-
-### Migration status
-See [docs/migration/feature-parity.md](docs/migration/feature-parity.md). Work lives on branch `feat/nextjs-frontend-migration`. Gradio is **not** removed yet.
+- **Next.js UI**: Primary workspace (Chat, Documents, Sources, Graph, Settings)
+- **Streamlit Dashboard**: Optional analytics only
 
 ## 🛠️ System Requirements
 
@@ -100,11 +96,11 @@ python install_dependencies.py
 # Setup LM Studio integration
 python migrate_to_lmstudio.py
 
-# Launch legacy Gradio UI
-python main_launcher.py
+# Launch product UI (Next.js + FastAPI)
+pwsh scripts/dev.ps1
 ```
 
-### Next.js + FastAPI (recommended UI path)
+### Next.js + FastAPI (product UI)
 
 ```bash
 # Backend (repo root, venv active)
@@ -128,8 +124,7 @@ pwsh scripts/dev.ps1
 | Next.js workspace | http://127.0.0.1:3000 |
 | FastAPI | http://127.0.0.1:8000 |
 | API docs | http://127.0.0.1:8000/docs |
-| Gradio (legacy) | http://127.0.0.1:7860 |
-| Streamlit | http://127.0.0.1:8501 |
+| Streamlit (optional) | http://127.0.0.1:8501 |
 
 Environment templates: [`.env.example`](.env.example), [`frontend/.env.local.example`](frontend/.env.local.example).
 
@@ -192,11 +187,11 @@ python test_lmstudio_integration.py
 
 ### Basic Document Processing
 ```python
-# Upload documents via Gradio interface
+# Upload documents via the Next.js Documents workspace
 # Supported: PDF, DOCX, DOC, TXT files
 # Automatic text extraction and indexing
 
-# Query your documents
+# Query via Chat workspace or POST /api/chat
 query = "What are the main findings in the research?"
 # System returns relevant passages with citations
 ```
@@ -262,20 +257,19 @@ NeuraX/
 ├── 📁 backend/                # FastAPI thin service layer
 │   ├── main.py                # App factory, CORS, lifespan
 │   ├── api/routes/            # HTTP endpoints
-│   ├── services/              # Orchestration (mirrors Gradio)
+│   ├── services/              # Domain orchestration for HTTP
 │   └── tests/                 # API tests
 │
-├── 📁 frontend/               # Next.js App Router workspace
+├── 📁 frontend/               # Next.js App Router (product UI)
 │   ├── app/                   # Routes (chat, documents, …)
 │   ├── features/              # Feature UI
 │   ├── components/            # Shared UI
-│   └── tests/                 # Playwright migration tests
+│   └── tests/                 # Playwright tests
 │
-├── 📁 ui/                     # Legacy interfaces
-│   ├── gradio_app.py          # Gradio UI (still supported)
-│   └── streamlit_dashboard.py # Analytics dashboard
+├── 📁 ui/                     # Optional Streamlit analytics
+│   └── streamlit_dashboard.py
 │
-├── 📁 docs/migration/         # Baseline, architecture, parity
+├── 📁 docs/migration/         # Migration notes and parity
 ├── 📁 models/                 # Local model cache (LM Studio managed)
 ├── 📁 data/                   # Input data and uploads
 ├── 📁 vector_db/              # ChromaDB persistent storage
@@ -283,12 +277,12 @@ NeuraX/
 ├── 📁 logs/                   # System logs and error reports
 │
 ├── 🔧 config.py               # Central domain configuration
-├── 🚀 main_launcher.py        # Gradio/Streamlit orchestrator
+├── 🚀 main_launcher.py        # Domain runtime / optional Streamlit
 ├── 📋 requirements.txt        # Python dependencies
 ├── 🛠️ install_dependencies.py # Automated setup script
 ├── 📦 build_executables.py    # Portable build script
 ├── PRODUCT.md / DESIGN.md     # Product and design direction
-└── scripts/dev.ps1            # API + frontend dev launcher
+└── scripts/dev.ps1            # Primary: API + Next.js launcher
 ```
 
 ## 🧪 Tests
@@ -310,7 +304,7 @@ npm run test                      # requires API + frontend running
 - Install Python deps, Node deps, embedding models, Whisper, and LM Studio models while online.
 - Run with no required external APIs: frontend → local FastAPI → local Chroma/LM Studio.
 - Bind hosts explicitly for trusted LAN; keep `NEURAX_CORS_ORIGINS` tight (no `*`).
-- Gradio remains a fallback: `python main_launcher.py --mode gradio_only`.
+- Product UI: `pwsh scripts/dev.ps1` or run FastAPI + `npm run dev` in `frontend/`.
 
 ## 🩺 Troubleshooting
 
@@ -494,7 +488,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - **Hugging Face**: CLIP and Transformer models
 - **LM Studio**: Local LLM hosting platform
 - **ChromaDB**: Vector database infrastructure
-- **Gradio**: Modern web interface framework
+- **Next.js / FastAPI**: Product web UI and API
 
 ---
 

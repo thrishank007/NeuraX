@@ -98,16 +98,15 @@ CHROMA_CONFIG = {
     "allow_reset": True
 }
 
-# UI settings
-GRADIO_CONFIG = {
-    "server_name": "127.0.0.1",
-    "server_port": 7860,
-    "share": False
+# UI settings — product UI is Next.js + FastAPI (see frontend/, backend/)
+FRONTEND_CONFIG = {
+    "url": "http://127.0.0.1:3000",
+    "api_url": "http://127.0.0.1:8000",
 }
 
 STREAMLIT_CONFIG = {
     "server_port": 8501,
-    "server_address": "127.0.0.1"
+    "server_address": "127.0.0.1",
 }
 
 # Security and KG settings

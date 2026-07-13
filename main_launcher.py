@@ -2,14 +2,9 @@
 """
 Main launcher for NeuraX Multimodal RAG System
 
-This launcher orchestrates all system components including:
-- Ingestion processors (document, image, audio, notes)
-- Embedding manager and vector store
-- Query processor and retrieval system
-- LLM generator and citation generator
-- Knowledge graph security layer
-- Feedback system
-- UI interfaces (Gradio and Streamlit)
+Orchestrates domain components (ingestion, retrieval, generation, KG, feedback).
+Product UI is Next.js + FastAPI — not launched by this module by default.
+Optional Streamlit analytics dashboard can still be started with --mode streamlit_only.
 """
 import sys
 import os
@@ -30,7 +25,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 from setup_logging import setup_logging, get_logger
 from error_handler import ErrorHandler, ErrorCategory, ErrorSeverity
 from config import (
-    GRADIO_CONFIG, STREAMLIT_CONFIG, PERFORMANCE_CONFIG,
+    FRONTEND_CONFIG, STREAMLIT_CONFIG, PERFORMANCE_CONFIG,
     MODEL_DOWNLOAD_CONFIG, SECURITY_CONFIG, SEARCH_CONFIG,
     LLM_CONFIG, WHISPER_CONFIG, KG_CONFIG, FEEDBACK_CONFIG
 )
@@ -42,7 +37,6 @@ class NeuraXLauncher:
     def __init__(self):
         self.error_handler = ErrorHandler()
         self.logger = get_logger("NeuraXLauncher")
-        self.gradio_process = None
         self.streamlit_process = None
         self.shutdown_event = threading.Event()
         
@@ -453,61 +447,6 @@ class NeuraXLauncher:
         
         return tests
     
-    def launch_gradio_interface(self) -> bool:
-        """Launch Gradio chat interface with all integrated components"""
-        try:
-            self.logger.info("Launching Gradio interface...")
-            
-            # Import the Gradio app class
-            from ui.gradio_app import NeuraXGradioApp
-
-            # Create app instance and inject components
-            gradio_app = NeuraXGradioApp()
-            
-            # Inject initialized components
-            gradio_app.embedding_manager = self.embedding_manager
-            gradio_app.vector_store = self.vector_store
-            gradio_app.ingestion_manager = self.ingestion_manager
-            gradio_app.query_processor = self.query_processor
-            gradio_app.stt_processor = self.stt_processor
-            gradio_app.llm_generator = self.llm_generator
-            gradio_app.citation_generator = self.citation_generator
-            gradio_app.feedback_system = self.feedback_system
-            
-            # Create the Gradio interface
-            interface = gradio_app.create_interface()
-            
-            # Launch in a separate thread
-            def run_gradio():
-                try:
-                    interface.launch(
-                        server_name=GRADIO_CONFIG['server_name'],
-                        server_port=GRADIO_CONFIG['server_port'],
-                        share=GRADIO_CONFIG['share'],
-                        prevent_thread_lock=True,
-                        show_error=True
-                    )
-                except Exception as e:
-                    self.logger.error(f"Gradio interface error: {e}")
-            
-            gradio_thread = threading.Thread(target=run_gradio, daemon=True)
-            gradio_thread.start()
-            
-            # Wait a moment for startup and test connectivity
-            time.sleep(3)
-            
-            self.logger.info(f"✅ Gradio interface launched at http://{GRADIO_CONFIG['server_name']}:{GRADIO_CONFIG['server_port']}")
-            return True
-            
-        except Exception as e:
-            error_report = self.error_handler.handle_error(
-                e, ErrorCategory.PERFORMANCE,
-                context={'component': 'gradio_interface'},
-                severity=ErrorSeverity.HIGH
-            )
-            self.logger.error(f"❌ Failed to launch Gradio interface: {error_report.user_guidance}")
-            return False
-    
     def launch_streamlit_dashboard(self) -> bool:
         """Launch Streamlit monitoring dashboard with component integration"""
         try:
@@ -579,8 +518,10 @@ class NeuraXLauncher:
         print("\n" + "="*60)
         print("NeuraX Multimodal RAG System")
         print("="*60)
-        print(f"Gradio Interface: http://{GRADIO_CONFIG['server_name']}:{GRADIO_CONFIG['server_port']}")
-        print(f"Streamlit Dashboard: http://{STREAMLIT_CONFIG['server_address']}:{STREAMLIT_CONFIG['server_port']}")
+        print(f"Product UI (Next.js): {FRONTEND_CONFIG['url']}")
+        print(f"API (FastAPI):        {FRONTEND_CONFIG['api_url']}")
+        print(f"Optional Streamlit:   http://{STREAMLIT_CONFIG['server_address']}:{STREAMLIT_CONFIG['server_port']}")
+        print("\nStart the product UI with: pwsh scripts/dev.ps1")
         print("\nCommands:")
         print("  help      - Show this help message")
         print("  status    - Show system status and component health")
@@ -630,8 +571,9 @@ class NeuraXLauncher:
         print("  integrate - Test system integration with sample data")
         print("  quit      - Shutdown system gracefully")
         print("\nSystem URLs:")
-        print(f"  Gradio Interface: http://{GRADIO_CONFIG['server_name']}:{GRADIO_CONFIG['server_port']}")
-        print(f"  Streamlit Dashboard: http://{STREAMLIT_CONFIG['server_address']}:{STREAMLIT_CONFIG['server_port']}")
+        print(f"  Next.js UI:  {FRONTEND_CONFIG['url']}")
+        print(f"  FastAPI:     {FRONTEND_CONFIG['api_url']}")
+        print(f"  Streamlit:   http://{STREAMLIT_CONFIG['server_address']}:{STREAMLIT_CONFIG['server_port']} (optional)")
     
     def _show_api_info(self):
         """Show unified API information"""
@@ -755,19 +697,15 @@ class NeuraXLauncher:
         # Interface status
         print("User Interfaces:")
         print("-" * 30)
-        gradio_status = "✅ Running" if hasattr(self, 'gradio_process') else "❌ Not Running"
-        streamlit_status = "✅ Running" if (hasattr(self, 'streamlit_process') and 
-                                          self.streamlit_process and 
+        print(f"  Next.js UI:  {FRONTEND_CONFIG['url']} (start via scripts/dev.ps1)")
+        print(f"  FastAPI:     {FRONTEND_CONFIG['api_url']}")
+        streamlit_status = "✅ Running" if (hasattr(self, 'streamlit_process') and
+                                          self.streamlit_process and
                                           self.streamlit_process.poll() is None) else "❌ Not Running"
-        
-        print(f"  Gradio Interface: {gradio_status}")
-        if gradio_status == "✅ Running":
-            print(f"    URL: http://{GRADIO_CONFIG['server_name']}:{GRADIO_CONFIG['server_port']}")
-        
-        print(f"  Streamlit Dashboard: {streamlit_status}")
+        print(f"  Streamlit (optional): {streamlit_status}")
         if streamlit_status == "✅ Running":
             print(f"    URL: http://{STREAMLIT_CONFIG['server_address']}:{STREAMLIT_CONFIG['server_port']}")
-        
+
         print()
         
         # System health details
@@ -1140,15 +1078,14 @@ class NeuraXLauncher:
         
         self.logger.info("✅ NeuraX shutdown completed gracefully")
     
-    def run(self, mode: str = 'interactive', launch_gradio: bool = True, launch_streamlit: bool = True) -> int:
+    def run(self, mode: str = 'interactive', launch_streamlit: bool = False) -> int:
         """
         Main run method
-        
+
         Args:
-            mode: Run mode ('interactive', 'gradio_only', 'streamlit_only', 'headless')
-            launch_gradio: Whether to launch Gradio interface
-            launch_streamlit: Whether to launch Streamlit dashboard
-            
+            mode: Run mode ('interactive', 'streamlit_only', 'headless')
+            launch_streamlit: Whether to launch optional Streamlit dashboard
+
         Returns:
             Exit code (0 for success, 1 for failure)
         """
@@ -1156,40 +1093,29 @@ class NeuraXLauncher:
             # Validate system
             if not self.validate_system():
                 return 1
-            
+
             # Initialize components
             if not self.initialize_components():
                 return 1
-            
-            # Launch interfaces based on mode
-            if mode in ['interactive', 'gradio_only'] and launch_gradio:
-                if not self.launch_gradio_interface():
-                    self.logger.warning("Gradio interface failed to launch, continuing without it")
-            
-            if mode in ['interactive', 'streamlit_only'] and launch_streamlit:
+
+            if mode == 'streamlit_only' or launch_streamlit:
                 if not self.launch_streamlit_dashboard():
                     self.logger.warning("Streamlit dashboard failed to launch, continuing without it")
-            
-            # Run appropriate mode
+
             if mode == 'interactive':
                 self.run_interactive_mode()
-            elif mode == 'headless':
-                self.logger.info("Running in headless mode. Press Ctrl+C to stop.")
+            elif mode in ('headless', 'streamlit_only'):
+                self.logger.info(
+                    f"Running in {mode} mode. Product UI: {FRONTEND_CONFIG['url']}. Press Ctrl+C to stop."
+                )
                 try:
                     while not self.shutdown_event.is_set():
                         time.sleep(1)
                 except KeyboardInterrupt:
                     pass
-            elif mode in ['gradio_only', 'streamlit_only']:
-                self.logger.info(f"Running in {mode} mode. Press Ctrl+C to stop.")
-                try:
-                    while not self.shutdown_event.is_set():
-                        time.sleep(1)
-                except KeyboardInterrupt:
-                    pass
-            
+
             return 0
-            
+
         except Exception as e:
             error_report = self.error_handler.handle_error(
                 e, ErrorCategory.PERFORMANCE,
@@ -1198,31 +1124,40 @@ class NeuraXLauncher:
             )
             self.logger.error(f"Application failed: {error_report.user_guidance}")
             return 1
-        
+
         finally:
             self.shutdown()
 
 
 def main():
     """Main entry point"""
-    parser = argparse.ArgumentParser(description="NeuraX Multimodal RAG System")
-    parser.add_argument('--mode', choices=['interactive', 'gradio_only', 'streamlit_only', 'headless'],
-                       default='interactive', help='Run mode')
-    parser.add_argument('--no-gradio', action='store_true', help='Disable Gradio interface')
-    parser.add_argument('--no-streamlit', action='store_true', help='Disable Streamlit dashboard')
+    parser = argparse.ArgumentParser(
+        description="NeuraX Multimodal RAG System (domain runtime; product UI is Next.js + FastAPI)"
+    )
+    parser.add_argument(
+        '--mode',
+        choices=['interactive', 'streamlit_only', 'headless'],
+        default='interactive',
+        help='Run mode (use scripts/dev.ps1 for Next.js + API)',
+    )
+    parser.add_argument(
+        '--streamlit',
+        action='store_true',
+        help='Also launch optional Streamlit analytics dashboard',
+    )
     parser.add_argument('--validate-only', action='store_true', help='Only run validation and exit')
     parser.add_argument('--verbose', '-v', action='store_true', help='Verbose logging')
-    
+
     args = parser.parse_args()
-    
+
     # Setup logging
     if not setup_logging():
         print("Failed to setup logging system")
         return 1
-    
+
     # Create launcher
     launcher = NeuraXLauncher()
-    
+
     # Handle validate-only mode
     if args.validate_only:
         if launcher.validate_system():
@@ -1231,12 +1166,10 @@ def main():
         else:
             print("❌ System validation failed")
             return 1
-    
-    # Run the application
+
     return launcher.run(
         mode=args.mode,
-        launch_gradio=not args.no_gradio,
-        launch_streamlit=not args.no_streamlit
+        launch_streamlit=args.streamlit or args.mode == 'streamlit_only',
     )
 
 

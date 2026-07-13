@@ -115,6 +115,8 @@ Current Gradio UI (ui/gradio_app.py)
 | Missing models | None (4 models loaded) |
 | Environment | High system memory pressure noted |
 
-## Migration gate
+## Migration gate (closed)
 
-This baseline document exists. Frontend/FastAPI migration may proceed while **Gradio remains installed and runnable**.
+This baseline recorded Gradio behavior before the Next.js cutover.  
+**Gradio has been removed** (`ui/gradio_app.py` deleted; `gradio` dependency dropped).  
+Product UI is Next.js + FastAPI only. Keep this file as historical reference.

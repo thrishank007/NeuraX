@@ -1,4 +1,4 @@
-"""Lazy component registry — mirrors Gradio's _initialize_components pattern."""
+"""Lazy component registry for domain managers used by the API layer."""
 from __future__ import annotations
 
 import threading

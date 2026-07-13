@@ -1,4 +1,4 @@
-"""Document upload, indexing, listing, and deletion — mirrors Gradio orchestration."""
+"""Document upload, indexing, listing, and deletion."""
 from __future__ import annotations
 
 import re

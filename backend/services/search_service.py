@@ -1,4 +1,4 @@
-"""Search orchestration — same QueryProcessor paths as Gradio."""
+"""Search orchestration via QueryProcessor."""
 from __future__ import annotations
 
 from pathlib import Path

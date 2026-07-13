@@ -46,8 +46,7 @@ networkx
 plotly
 pyvis
 
-# UI Frameworks
-gradio
+# Optional analytics dashboard (product UI is Next.js)
 streamlit
 
 # FastAPI service layer (Next.js frontend)
