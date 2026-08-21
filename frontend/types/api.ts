@@ -26,6 +26,21 @@ export type SystemStatus = {
   supported_formats: string[];
   max_upload_mb: number;
   offline_mode: boolean;
+  graphify?: {
+    available?: boolean;
+    enabled?: boolean;
+    version?: string | null;
+    corpus_file_count?: number;
+    artifacts_available?: boolean;
+    build_running?: boolean;
+    model?: string;
+    error?: string;
+  };
+  cloud_llm?: {
+    configured: boolean;
+    api_url: string;
+    model: string;
+  };
 };
 
 export type ModelsStatus = {
@@ -94,6 +109,51 @@ export type ChatResponse = {
   sources: SearchResultItem[];
   model_used: string;
   lm_studio_available: boolean;
+  graph_context_used?: boolean;
+  graph_warning?: string | null;
+};
+
+export type GraphifyStatus = {
+  enabled: boolean;
+  available: boolean;
+  executable?: string | null;
+  version?: string | null;
+  install_hint: string;
+  workspace_id: string;
+  corpus_file_count: number;
+  last_build_time?: string | null;
+  build_running: boolean;
+  artifacts_available: boolean;
+  artifact_paths: Record<string, string | null | undefined>;
+  lm_studio_base_url: string;
+  model: string;
+  backend: string;
+  auto_update_after_ingestion: boolean;
+  endpoint_allowed: boolean;
+  endpoint_warning?: string | null;
+  capabilities?: Record<string, unknown>;
+  last_error?: string | null;
+};
+
+export type GraphifyBuildResult = {
+  success: boolean;
+  workspace_id: string;
+  mode: string;
+  message: string;
+  duration_seconds?: number;
+  artifacts?: Record<string, string | null | undefined>;
+  logs?: string;
+  error?: string | null;
+};
+
+export type GraphifyQueryResult = {
+  success: boolean;
+  kind: string;
+  output: string;
+  nodes?: Record<string, unknown>[];
+  sources?: string[];
+  error?: string | null;
+  duration_seconds?: number;
 };
 
 export type ChatMessage = {
@@ -107,5 +167,6 @@ export type ChatMessage = {
   confidence?: number;
   processing_time?: number;
   model_used?: string;
+  mode?: "local" | "cloud";
   status?: "pending" | "streaming" | "done" | "error";
 };

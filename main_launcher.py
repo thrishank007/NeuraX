@@ -27,7 +27,8 @@ from error_handler import ErrorHandler, ErrorCategory, ErrorSeverity
 from config import (
     FRONTEND_CONFIG, STREAMLIT_CONFIG, PERFORMANCE_CONFIG,
     MODEL_DOWNLOAD_CONFIG, SECURITY_CONFIG, SEARCH_CONFIG,
-    LLM_CONFIG, WHISPER_CONFIG, KG_CONFIG, FEEDBACK_CONFIG
+    LLM_CONFIG, WHISPER_CONFIG, KG_CONFIG, FEEDBACK_CONFIG,
+    GRAPHIFY_CONFIG,
 )
 
 
@@ -48,7 +49,8 @@ class NeuraXLauncher:
         self.stt_processor = None
         self.llm_generator = None
         self.citation_generator = None
-        self.kg_manager = None
+        self.kg_manager = None  # existing NetworkX security graph
+        self.graphify_service = None  # optional Graphify document graph
         self.feedback_system = None
         self.metrics_collector = None
         
@@ -62,6 +64,7 @@ class NeuraXLauncher:
             'llm_generator': False,
             'citation_generator': False,
             'kg_manager': False,
+            'graphify_service': False,
             'feedback_system': False,
             'metrics_collector': False
         }
@@ -166,9 +169,12 @@ class NeuraXLauncher:
             if not self._initialize_citation_generator():
                 return False
             
-            # Initialize knowledge graph manager
+            # Initialize knowledge graph manager (security NetworkX graph)
             if not self._initialize_kg_manager():
                 return False
+
+            # Optional Graphify document graph — never blocks startup
+            self._initialize_graphify_service()
             
             # Initialize feedback system
             if not self._initialize_feedback_system():
@@ -338,6 +344,31 @@ class NeuraXLauncher:
             self.logger.error(f"❌ Failed to initialize knowledge graph manager: {e}")
             self.system_health['component_errors'].append(f"kg_manager: {e}")
             return False
+
+    def _initialize_graphify_service(self) -> bool:
+        """Initialize optional Graphify document-graph service (non-fatal if missing)."""
+        try:
+            from kg_security.graphify_service import GraphifyService
+            self.graphify_service = GraphifyService(GRAPHIFY_CONFIG)
+            self.component_status['graphify_service'] = True
+            status = self.graphify_service.get_status()
+            if status.available:
+                self.logger.info(
+                    f"✅ Graphify service ready (version={status.version}, model={status.model})"
+                )
+            else:
+                self.logger.warning(
+                    "⚠️ Graphify CLI not found — document knowledge graph disabled. "
+                    "Install with: uv tool install \"graphifyy[openai]\" "
+                    "or pipx install \"graphifyy[openai]\""
+                )
+            return True
+        except Exception as e:
+            self.logger.warning(f"⚠️ Graphify service init skipped: {e}")
+            self.component_status['graphify_service'] = False
+            self.system_health['component_errors'].append(f"graphify_service: {e}")
+            # Never fail application startup solely because Graphify is unavailable
+            return True
     
     def _initialize_feedback_system(self) -> bool:
         """Initialize feedback system"""
@@ -383,7 +414,9 @@ class NeuraXLauncher:
         ]
         
         # Optional components (system can function with reduced capability)
-        optional_components = ['stt_processor', 'llm_generator', 'metrics_collector']
+        optional_components = [
+            'stt_processor', 'llm_generator', 'metrics_collector', 'graphify_service'
+        ]
         
         # Check critical components
         for component in critical_components:
@@ -430,11 +463,28 @@ class NeuraXLauncher:
             else:
                 tests['integration_warnings'].append("⚠️ Query pipeline incomplete")
             
-            # Test knowledge graph integration
+            # Test knowledge graph integration (security NetworkX graph)
             if self.kg_manager and self.vector_store:
                 tests['integration_tests'].append("✅ Knowledge graph integration ready")
             else:
                 tests['integration_warnings'].append("⚠️ Knowledge graph integration incomplete")
+
+            # Graphify is optional
+            if self.graphify_service is not None:
+                try:
+                    gstatus = self.graphify_service.get_status()
+                    if gstatus.available:
+                        tests['integration_tests'].append(
+                            f"✅ Graphify document graph available ({gstatus.version or 'version unknown'})"
+                        )
+                    else:
+                        tests['integration_warnings'].append(
+                            "⚠️ Graphify CLI not installed (document knowledge graph optional)"
+                        )
+                except Exception as ge:
+                    tests['integration_warnings'].append(f"⚠️ Graphify status check failed: {ge}")
+            else:
+                tests['integration_warnings'].append("⚠️ Graphify service not initialized")
             
             # Test feedback integration
             if self.feedback_system and self.metrics_collector:

@@ -4,7 +4,13 @@
 !PRODUCT.md
 !DESIGN.md
 !docs/**/*.md
+.agents
+.claude
+.cursor
+.codex
+.impeccable
 
+vector_db/
 .kiro
 venv
 __pycache__
@@ -17,9 +23,16 @@ frontend/playwright-report
 .pytest_cache
 data/uploads/**
 !data/uploads/.gitkeep
+# Graphify managed corpus, caches, and artifacts (local-only)
+data/graphify/**
+!data/graphify/.gitkeep
+**/graphify-out/**
+**/.graphify/
 cache/
 logs/
 *.log
 .env
 .env.local
 frontend/.env.local
+.pytest-tmp*
+test_graphify_doc.*

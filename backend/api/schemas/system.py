@@ -15,6 +15,9 @@ class SystemStatusResponse(BaseModel):
     supported_formats: list[str] = Field(default_factory=list)
     max_upload_mb: int = 100
     offline_mode: bool = True
+    cloud_llm: dict[str, Any] = Field(default_factory=dict)
+    # Optional Graphify document-graph health (never blocks startup)
+    graphify: dict[str, Any] = Field(default_factory=dict)
 
 
 class ModelsStatusResponse(BaseModel):

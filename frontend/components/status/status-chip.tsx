@@ -21,7 +21,7 @@ function toneFor(kind: StatusKind) {
   switch (kind) {
     case "ok":
     case "ready":
-      return "success" as const;
+      return "emerald" as const;
     case "degraded":
     case "loading":
       return "warning" as const;
@@ -29,40 +29,29 @@ function toneFor(kind: StatusKind) {
     case "error":
       return "danger" as const;
     case "offline":
-      return "info" as const;
+      return "cyan" as const;
     default:
       return "neutral" as const;
-  }
-}
-
-function Icon({ kind }: { kind: StatusKind }) {
-  const cls = "h-3.5 w-3.5 shrink-0";
-  switch (kind) {
-    case "ok":
-    case "ready":
-      return <CheckCircle2 className={cls} aria-hidden />;
-    case "loading":
-      return <Loader2 className={`${cls} animate-spin`} aria-hidden />;
-    case "offline":
-      return <WifiOff className={cls} aria-hidden />;
-    case "degraded":
-      return <CircleDashed className={cls} aria-hidden />;
-    default:
-      return <AlertCircle className={cls} aria-hidden />;
   }
 }
 
 export function StatusChip({
   kind,
   label,
+  value,
 }: {
   kind: StatusKind;
   label: string;
+  value?: string | number;
 }) {
   return (
-    <Badge tone={toneFor(kind)} aria-label={label}>
-      <Icon kind={kind} />
-      <span>{label}</span>
+    <Badge tone={toneFor(kind)} dot className="px-2 py-0.5" aria-label={`${label}: ${value ?? kind}`}>
+      <span className="font-sans font-medium text-text">{label}</span>
+      {value !== undefined && (
+        <span className="font-mono text-muted ml-1">
+          ({value})
+        </span>
+      )}
     </Badge>
   );
 }

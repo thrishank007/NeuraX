@@ -38,6 +38,8 @@ class ChatRequest(BaseModel):
     query: str = Field(..., min_length=1)
     similarity_threshold: Optional[float] = Field(default=None, ge=0.0, le=1.0)
     max_docs: int = Field(default=5, ge=1, le=10)
+    use_knowledge_graph: bool = False
+    mode: Literal["local", "cloud"] = "local"
 
 
 class CitationItem(BaseModel):
@@ -61,6 +63,8 @@ class ChatResponse(BaseModel):
     sources: List[SearchResultItem] = Field(default_factory=list)
     model_used: str = ""
     lm_studio_available: bool = True
+    graph_context_used: bool = False
+    graph_warning: Optional[str] = None
 
 
 class FeedbackRequest(BaseModel):

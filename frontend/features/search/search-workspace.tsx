@@ -1,404 +1,301 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { Image as ImageIcon, Loader2, Mic, Search, Shuffle, Trash2 } from "lucide-react";
+import { useState } from "react";
+import {
+  FileText,
+  Image as ImageIcon,
+  Mic,
+  Search,
+  Sparkles,
+  Layers,
+  Clock,
+  Loader2,
+  FileCode,
+  FileAudio,
+} from "lucide-react";
 import { api, ApiClientError } from "@/lib/api";
 import type { SearchResultItem } from "@/types/api";
-import {
-  clearQueryHistory,
-  loadQueryHistory,
-  pushQueryHistory,
-  storeLastSearch,
-  type QueryHistoryEntry,
-} from "@/lib/query-history";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { pushQueryHistory } from "@/lib/query-history";
 
 type Modality = "text" | "image" | "voice" | "multimodal";
-
-const MODES: { id: Modality; label: string; icon: typeof Search }[] = [
-  { id: "text", label: "Text", icon: Search },
-  { id: "image", label: "Image", icon: ImageIcon },
-  { id: "voice", label: "Voice", icon: Mic },
-  { id: "multimodal", label: "Multimodal", icon: Shuffle },
-];
 
 export function SearchWorkspace() {
   const [modality, setModality] = useState<Modality>("text");
   const [query, setQuery] = useState("");
-  const [threshold, setThreshold] = useState(0.5);
-  const [k, setK] = useState(10);
+  const [threshold, setThreshold] = useState(0.4);
+  const [maxResults, setMaxResults] = useState(6);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [audioFile, setAudioFile] = useState<File | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [status, setStatus] = useState("Ready for queries");
   const [results, setResults] = useState<SearchResultItem[]>([]);
   const [transcription, setTranscription] = useState<string | null>(null);
-  const [history, setHistory] = useState<QueryHistoryEntry[]>([]);
-  const imageRef = useRef<HTMLInputElement | null>(null);
-  const audioRef = useRef<HTMLInputElement | null>(null);
-  const multiImageRef = useRef<HTMLInputElement | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [time, setTime] = useState<number | null>(null);
 
-  useEffect(() => {
-    setHistory(loadQueryHistory());
-  }, []);
-
-  async function runSearch() {
+  async function handleSearch() {
     setError(null);
     setTranscription(null);
-
-    if (modality === "text" && !query.trim()) {
-      setError("Enter a text query");
-      return;
-    }
-    if (modality === "image" && !imageFile) {
-      setError("Upload an image for image search");
-      return;
-    }
-    if (modality === "voice" && !audioFile) {
-      setError("Upload an audio file for voice search");
-      return;
-    }
-    if (modality === "multimodal") {
-      if (!query.trim()) {
-        setError("Enter text for multimodal search");
-        return;
-      }
-      if (!imageFile) {
-        setError("Upload an image for multimodal search");
-        return;
-      }
-    }
-
     setBusy(true);
-    setStatus("Searching…");
-    const controller = new AbortController();
 
     try {
-      const payload = await api.search(
-        {
-          query: query.trim(),
-          modality,
-          similarity_threshold: threshold,
-          k,
-          image: imageFile,
-          audio: audioFile,
-        },
-        controller.signal,
-      );
-
-      setResults(payload.results);
-      if (payload.transcription) {
-        setTranscription(payload.transcription);
+      if (modality === "text" && !query.trim()) {
+        setError("Enter a query text to search");
+        setBusy(false);
+        return;
+      }
+      if (modality === "image" && !imageFile) {
+        setError("Select an image file for visual search");
+        setBusy(false);
+        return;
+      }
+      if (modality === "voice" && !audioFile) {
+        setError("Select an audio recording for voice search");
+        setBusy(false);
+        return;
       }
 
-      const label =
-        modality === "image"
-          ? "[Image Query]"
-          : modality === "voice"
-            ? payload.transcription || "[Voice Query]"
-            : modality === "multimodal"
-              ? `${query.trim()} + [Image]`
-              : payload.query;
-
-      if (payload.results.length) {
-        setStatus(
-          `Found ${payload.results.length} results in ${payload.processing_time.toFixed(2)}s`,
-        );
-      } else {
-        setStatus(
-          `No results (threshold ${payload.similarity_threshold.toFixed(2)}). Try lowering the threshold.`,
-        );
-      }
-
-      const next = pushQueryHistory({
-        query: label,
-        type: modality,
-        results_count: payload.results.length,
-        processing_time: payload.processing_time,
-        transcription: payload.transcription || undefined,
-      });
-      setHistory(next);
-      storeLastSearch({
-        query: label,
-        sources: payload.results,
+      const res = await api.search({
+        query: query.trim() || undefined,
         modality,
+        similarity_threshold: threshold,
+        k: maxResults,
+        image: imageFile,
+        audio: audioFile,
+      });
+
+      setResults(res.results || []);
+      setTranscription(res.transcription || null);
+      setTime(res.processing_time);
+
+      pushQueryHistory({
+        query: query.trim() || imageFile?.name || audioFile?.name || "Multimodal Search",
+        type: modality,
+        results_count: res.results?.length || 0,
+        processing_time: res.processing_time,
       });
     } catch (err) {
-      const msg =
-        err instanceof ApiClientError ? err.message : "Search failed";
-      setError(msg);
-      setStatus("Search failed");
-      setResults([]);
+      setError(
+        err instanceof ApiClientError ? err.message : "Search query execution failed",
+      );
     } finally {
       setBusy(false);
     }
   }
 
-  function clearAll() {
-    setQuery("");
-    setImageFile(null);
-    setAudioFile(null);
-    setResults([]);
-    setTranscription(null);
-    setError(null);
-    setStatus("Ready for queries");
-    if (imageRef.current) imageRef.current.value = "";
-    if (audioRef.current) audioRef.current.value = "";
-    if (multiImageRef.current) multiImageRef.current.value = "";
-  }
+  const TABS = [
+    { id: "text", label: "Semantic Text", icon: FileText },
+    { id: "image", label: "CLIP Vision", icon: ImageIcon },
+    { id: "voice", label: "Whisper Audio", icon: Mic },
+    { id: "multimodal", label: "Fused Multi", icon: Layers },
+  ] as const;
 
   return (
-    <div className="mx-auto flex max-w-5xl flex-col gap-4 p-4">
-      <header className="flex flex-wrap items-start justify-between gap-2">
-        <div>
-          <h1 className="text-base font-semibold">Search</h1>
-          <p className="text-xs text-muted">
-            Multimodal retrieval without generation — same pipeline as Gradio
-            Search &amp; Query
-          </p>
+    <div className="mx-auto max-w-4xl space-y-6 p-4 sm:p-8">
+      {/* Search Hub Header */}
+      <header className="space-y-1">
+        <div className="flex items-center gap-2 text-xs font-semibold uppercase text-accent">
+          <Sparkles className="h-3.5 w-3.5" />
+          <span>Multimodal Discovery</span>
         </div>
-        <div className="flex flex-wrap items-center gap-3 text-xs text-muted">
-          <label className="flex items-center gap-1">
-            Threshold
-            <input
-              type="range"
-              min={0}
-              max={1}
-              step={0.05}
-              value={threshold}
-              onChange={(e) => setThreshold(Number(e.target.value))}
-              aria-label="Similarity threshold"
-              className="w-24"
-            />
-            <span className="font-mono text-text">{threshold.toFixed(2)}</span>
-          </label>
-          <label className="flex items-center gap-1">
-            Max results
-            <input
-              type="number"
-              min={1}
-              max={50}
-              value={k}
-              onChange={(e) => setK(Number(e.target.value) || 10)}
-              aria-label="Maximum results"
-              className="w-12 rounded border border-border bg-surface px-1 py-0.5 font-mono text-text"
-            />
-          </label>
-        </div>
+        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-text">
+          Search the entire offline index
+        </h1>
+        <p className="text-xs text-muted">
+          Direct vector similarity matching across text embeddings, visual CLIP projections, and audio transcripts.
+        </p>
       </header>
 
-      <div
-        role="tablist"
-        aria-label="Search modality"
-        className="flex flex-wrap gap-1 rounded-lg border border-border bg-surface p-1"
-      >
-        {MODES.map((m) => {
-          const Icon = m.icon;
-          const active = modality === m.id;
+      {/* Perplexity-Style Modality Segmented Bar */}
+      <div className="flex rounded-2xl border border-border bg-surface p-1.5 max-w-lg shadow-2xs">
+        {TABS.map((t) => {
+          const Icon = t.icon;
+          const active = modality === t.id;
           return (
             <button
-              key={m.id}
+              key={t.id}
               type="button"
-              role="tab"
-              aria-selected={active}
-              className={cn(
-                "inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm",
-                active
-                  ? "bg-accent-subtle text-accent"
-                  : "text-muted hover:bg-surface-2 hover:text-text",
-              )}
               onClick={() => {
-                setModality(m.id);
+                setModality(t.id);
                 setError(null);
               }}
+              className={cn(
+                "flex flex-1 items-center justify-center gap-1.5 rounded-xl py-2 text-xs font-medium transition-all cursor-pointer",
+                active
+                  ? "bg-accent/15 text-accent font-semibold shadow-xs"
+                  : "text-muted hover:text-text",
+              )}
             >
-              <Icon className="h-3.5 w-3.5" aria-hidden />
-              {m.label}
+              <Icon className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">{t.label}</span>
             </button>
           );
         })}
       </div>
 
-      <section className="rounded-lg border border-border bg-surface p-3">
+      {/* Input Search Console */}
+      <div className="rounded-2xl border border-border bg-surface shadow-hud p-5 space-y-4">
         {(modality === "text" || modality === "multimodal") && (
-          <label className="block text-xs font-medium text-muted">
-            {modality === "multimodal" ? "Text component" : "Text query"}
-            <Textarea
-              className="mt-1"
+          <div>
+            <label className="block text-xs font-semibold text-text mb-1.5">
+              Search Query
+            </label>
+            <input
+              type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder={
-                modality === "multimodal"
-                  ? "Describe what you're looking for…"
-                  : "e.g. security protocols, network configuration…"
-              }
-              rows={2}
-              aria-label="Search query text"
+              placeholder="Search concepts, technical specifications, or keywords..."
+              className="w-full rounded-xl border border-border bg-surface-2 px-3.5 py-2.5 text-sm text-text placeholder:text-dim focus:outline-none focus:border-accent/40"
+              onKeyDown={(e) => {
+                if (e.key === "Enter") void handleSearch();
+              }}
             />
-          </label>
+          </div>
         )}
 
         {(modality === "image" || modality === "multimodal") && (
-          <div className="mt-3">
-            <label className="text-xs font-medium text-muted">
-              {modality === "multimodal" ? "Image component" : "Image query"}
+          <div className="space-y-1.5">
+            <label className="block text-xs font-semibold text-text">
+              Image Target (CLIP Embedding)
             </label>
-            <input
-              ref={modality === "image" ? imageRef : multiImageRef}
-              type="file"
-              accept=".jpg,.jpeg,.png,.bmp,.tiff,.gif,.webp"
-              aria-label="Upload image for search"
-              className="mt-1 block w-full text-sm text-muted file:mr-3 file:rounded-md file:border-0 file:bg-surface-2 file:px-3 file:py-1.5 file:text-sm file:text-text"
-              onChange={(e) => setImageFile(e.target.files?.[0] || null)}
-            />
-            {imageFile && (
-              <p className="mt-1 font-mono text-[11px] text-muted">
-                {imageFile.name}
-              </p>
-            )}
+            <div className="rounded-xl border border-dashed border-border bg-surface-2/60 p-4 text-center">
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) => setImageFile(e.target.files?.[0] || null)}
+                className="text-xs text-muted file:mr-3 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:bg-accent/15 file:text-accent file:cursor-pointer"
+              />
+              {imageFile && (
+                <p className="mt-2 text-xs text-accent font-medium">Selected: {imageFile.name}</p>
+              )}
+            </div>
           </div>
         )}
 
-        {modality === "voice" && (
-          <div>
-            <label className="text-xs font-medium text-muted">
-              Voice query (audio file)
+        {(modality === "voice" || modality === "multimodal") && (
+          <div className="space-y-1.5">
+            <label className="block text-xs font-semibold text-text">
+              Audio Target (Whisper Speech-To-Text)
             </label>
-            <input
-              ref={audioRef}
-              type="file"
-              accept=".wav,.mp3,.m4a,.flac,.ogg"
-              aria-label="Upload audio for voice search"
-              className="mt-1 block w-full text-sm text-muted file:mr-3 file:rounded-md file:border-0 file:bg-surface-2 file:px-3 file:py-1.5 file:text-sm file:text-text"
-              onChange={(e) => setAudioFile(e.target.files?.[0] || null)}
-            />
-            {audioFile && (
-              <p className="mt-1 font-mono text-[11px] text-muted">
-                {audioFile.name}
-              </p>
-            )}
-            {transcription && (
-              <p className="mt-2 rounded-md border border-border bg-surface-2 px-2 py-1.5 text-sm">
-                <span className="text-muted">Transcription: </span>
-                {transcription}
-              </p>
-            )}
+            <div className="rounded-xl border border-dashed border-border bg-surface-2/60 p-4 text-center">
+              <input
+                type="file"
+                accept="audio/*"
+                onChange={(e) => setAudioFile(e.target.files?.[0] || null)}
+                className="text-xs text-muted file:mr-3 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:bg-accent/15 file:text-accent file:cursor-pointer"
+              />
+              {audioFile && (
+                <p className="mt-2 text-xs text-accent font-medium">Selected: {audioFile.name}</p>
+              )}
+            </div>
           </div>
         )}
 
-        <div className="mt-3 flex flex-wrap gap-2">
-          <Button onClick={() => void runSearch()} disabled={busy}>
+        {/* Action strip & threshold controls */}
+        <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-border/50 text-xs">
+          <div className="flex flex-wrap items-center gap-4 text-muted">
+            <div className="flex items-center gap-2">
+              <span>Threshold:</span>
+              <input
+                type="range"
+                min={0}
+                max={1}
+                step={0.05}
+                value={threshold}
+                onChange={(e) => setThreshold(Number(e.target.value))}
+                className="w-16 accent-accent h-1.5 cursor-pointer"
+              />
+              <span className="text-text font-semibold">{threshold.toFixed(2)}</span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span>Max Matches:</span>
+              <input
+                type="number"
+                min={1}
+                max={20}
+                value={maxResults}
+                onChange={(e) => setMaxResults(Number(e.target.value) || 6)}
+                className="w-12 rounded border border-border bg-surface-2 px-1.5 py-0.5 text-center text-text font-medium"
+              />
+            </div>
+          </div>
+
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={() => void handleSearch()}
+            disabled={busy}
+            className="rounded-xl px-5"
+          >
             {busy ? (
-              <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+              <>
+                <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
+                <span>Searching…</span>
+              </>
             ) : (
-              <Search className="h-4 w-4" aria-hidden />
+              <>
+                <Search className="h-3.5 w-3.5 mr-1.5" />
+                <span>Run Search</span>
+              </>
             )}
-            Search
-          </Button>
-          <Button variant="secondary" onClick={clearAll} disabled={busy}>
-            Clear
           </Button>
         </div>
-
-        <p className="mt-2 text-xs text-muted" role="status" aria-live="polite">
-          {status}
-        </p>
-        {error && (
-          <p className="mt-1 text-xs text-danger" role="alert">
-            {error}
-          </p>
-        )}
-      </section>
-
-      <div className="grid gap-4 lg:grid-cols-[1fr_240px]">
-        <section aria-label="Search results">
-          <h2 className="mb-2 text-sm font-semibold">Results</h2>
-          {results.length === 0 ? (
-            <div className="rounded-lg border border-dashed border-border bg-surface p-6 text-sm text-muted">
-              No results yet. Run a search to retrieve matching chunks without
-              generating an answer.
-            </div>
-          ) : (
-            <ul className="space-y-2">
-              {results.map((r, i) => (
-                <li
-                  key={r.id || `${r.file_path}-${i}`}
-                  className="rounded-lg border border-border bg-surface p-3"
-                >
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <span className="text-sm font-medium">
-                      {r.file_name || r.file_path || r.id || "Result"}
-                    </span>
-                    <Badge tone="neutral">
-                      <span className="font-mono">
-                        {r.similarity_score.toFixed(3)}
-                      </span>
-                    </Badge>
-                  </div>
-                  <p className="mt-0.5 font-mono text-[11px] text-muted">
-                    {r.file_type || "unknown"}
-                    {r.text_similarity != null
-                      ? ` · text ${r.text_similarity.toFixed(3)}`
-                      : ""}
-                    {r.image_similarity != null
-                      ? ` · image ${r.image_similarity.toFixed(3)}`
-                      : ""}
-                  </p>
-                  <p className="mt-2 text-sm leading-relaxed text-text">
-                    {r.content_preview || "No preview"}
-                  </p>
-                  {r.file_path && (
-                    <p className="mt-1 break-all font-mono text-[10px] text-muted">
-                      {r.file_path}
-                    </p>
-                  )}
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-
-        <aside className="rounded-lg border border-border bg-surface p-3">
-          <div className="mb-2 flex items-center justify-between">
-            <h2 className="text-sm font-semibold">Query history</h2>
-            <Button
-              size="sm"
-              variant="ghost"
-              aria-label="Clear query history"
-              onClick={() => {
-                clearQueryHistory();
-                setHistory([]);
-              }}
-            >
-              <Trash2 className="h-3.5 w-3.5" />
-            </Button>
-          </div>
-          {history.length === 0 ? (
-            <p className="text-xs text-muted">No queries yet.</p>
-          ) : (
-            <ul className="max-h-80 space-y-2 overflow-y-auto scroll-panel">
-              {history.map((h) => (
-                <li
-                  key={h.id}
-                  className="rounded-md border border-border bg-surface-2 px-2 py-1.5 text-xs"
-                >
-                  <div className="font-medium text-text">
-                    <span className="text-muted">[{h.type}] </span>
-                    {h.query.length > 60 ? `${h.query.slice(0, 60)}…` : h.query}
-                  </div>
-                  <div className="mt-0.5 font-mono text-[10px] text-muted">
-                    {h.results_count} hits · {h.processing_time.toFixed(2)}s
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </aside>
       </div>
+
+      {error && (
+        <div className="text-xs text-signal-rose bg-signal-rose/10 p-3.5 rounded-xl border border-signal-rose/20" role="alert">
+          {error}
+        </div>
+      )}
+
+      {transcription && (
+        <div className="rounded-xl border border-border bg-surface p-4 space-y-1.5 text-xs">
+          <span className="text-accent text-xs uppercase font-bold">
+            Whisper Audio Transcription:
+          </span>
+          <p className="text-text font-medium">{transcription}</p>
+        </div>
+      )}
+
+      {/* Results Grid */}
+      {results.length > 0 && (
+        <div className="space-y-3 pt-2">
+          <div className="flex items-center justify-between text-xs text-muted font-medium">
+            <span>Found {results.length} matched vectors</span>
+            {time != null && <span>Search completed in {time.toFixed(2)}s</span>}
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {results.map((r, idx) => (
+              <div
+                key={r.id || idx}
+                className="rounded-2xl border border-border bg-surface hover:bg-surface-2 p-4 space-y-2.5 text-xs transition-colors shadow-2xs"
+              >
+                <div className="flex items-center justify-between gap-2 border-b border-border/40 pb-2">
+                  <span className="truncate font-semibold text-text text-xs">
+                    {r.file_name || r.file_path}
+                  </span>
+                  <span className="text-xs text-accent font-bold px-2 py-0.5 rounded bg-accent/15">
+                    {r.similarity_score.toFixed(2)} match
+                  </span>
+                </div>
+
+                <p className="text-xs text-text/90 leading-relaxed bg-surface-2/60 p-3 rounded-xl">
+                  {r.content_preview}
+                </p>
+
+                <div className="flex items-center justify-between text-[11px] text-dim pt-1 font-medium">
+                  <span>Type: {r.file_type || "document"}</span>
+                  <span className="truncate max-w-[150px] font-mono">{r.file_path}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

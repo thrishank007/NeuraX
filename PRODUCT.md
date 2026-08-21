@@ -1,56 +1,60 @@
-# NeuraX Product
+# Product
 
-## What it is
+<!-- impeccable:product-schema 1 -->
 
-NeuraX is a **local-first multimodal document intelligence** workspace for secure, offline RAG over documents, images, and audio. It is a productivity product for analysts—not a marketing site or generic chat toy.
+## Platform
+
+web
 
 ## Users
 
-- Analysts and operators who must keep data on-prem / air-gapped  
-- Engineers evaluating retrieval quality with visible sources  
-- Teams who already run LM Studio locally  
+- Intelligence analysts and security operators who require air-gapped, zero-cloud data processing for sensitive documentation
+- Technical teams and engineers running local LLMs (via LM Studio) seeking multimodal document intelligence without external APIs
+- Operators evaluating retrieval quality and document provenance with full citation auditability
 
-## Jobs to be done
+## Product Purpose
 
-1. Ingest multimodal files into a local index  
-2. Search across modalities with adjustable strictness  
-3. Ask grounded questions and inspect citations  
-4. Trust system status (backend, vector store, LM Studio) at a glance  
-5. Work without cloud services  
+NeuraX is a local-first, offline multimodal Retrieval-Augmented Generation (RAG) workspace. It enables ingestion, cross-modal querying, and evidence-grounded analysis across text documents (PDF, DOCX, TXT), images (PNG, JPG, TIFF), and audio files (WAV, MP3, FLAC). Success means rapid, trustworthy question-answering with visible provenance, reliable local index health, and zero data egress.
 
-## Interface principles
+## Positioning
 
-1. **Status over chrome** — connectivity and index health always visible  
-2. **Sources are first-class** — every answer can open provenance  
-3. **Dense, calm productivity** — high information density without clutter  
-4. **Honest empty and failure states** — never fake generation success  
-5. **Local-first language** — privacy and offline are product features, not footnotes  
-6. **Keyboard-friendly** — primary workflows usable without a mouse  
+A completely offline, local-first multimodal RAG system operating entirely on local infrastructure (FastAPI, ChromaDB, CLIP, Whisper, LM Studio) with real-time knowledge graph tamper detection and zero cloud telemetry.
 
-## Navigation model
+## Operating Context
 
-```text
-Workspace
-├── Chat              Primary Q&A + citations + source panel
-├── Documents         Upload, index progress, inventory, delete
-├── Sources           Inspect selected retrieval provenance
-├── Knowledge Graph   Graph export when available (Streamlit-parity data)
-└── Settings          Thresholds, context size, connection diagnostics
-```
+- Air-gapped workstations or private local servers with CPU/GPU compute
+- Local LM Studio server hosting multimodal models (e.g. Gemma 3n) and reasoning models (e.g. Qwen3 4B)
+- Dedicated analytical workspace divided into five views: Chat (Q&A with citation drawer), Documents (batch upload, progress, inventory), Sources (retrieval inspection), Knowledge Graph (corpus & security graph analysis), and Settings (diagnostics and threshold controls)
 
-## Critical states (must be explicit)
+## Capabilities and Constraints
 
-- Backend starting / unavailable  
-- LM Studio unavailable / no model loaded  
-- No documents indexed  
-- Upload / indexing in progress or failed  
-- Query running / response ready / generation failed  
-- Retrieval returned no useful context  
-- Offline mode active  
+- **Capabilities**: Multimodal file ingestion with OCR and speech-to-text; cross-modal search via CLIP & ChromaDB; streaming grounded generation via LM Studio; citation score tracking; tamper-evident knowledge graph monitoring.
+- **Technical Constraints**: Zero internet connectivity during operation; Next.js frontend (:3000) talking over HTTP/SSE to FastAPI service layer (:8000); strictly local vector and cache storage.
+- **Non-Goals**: Hosted multi-tenant auth, cloud vector databases, or telemetry/analytics SDKs.
 
-## Non-goals for the UI migration
+## Brand Commitments
 
-- Hosted accounts or multi-tenant auth  
-- Cloud vector databases  
-- Telemetry / analytics SDKs  
-- Rewriting retrieval quality experiments into the UI layer  
+- **Name**: NeuraX
+- **Voice**: Calm, precise, diagnostic, and transparent about system status and limitations
+- **Incumbent Visual System**: Preserved in `DESIGN.md` (IBM Plex Sans / IBM Plex Mono typography, warm paper light mode, dark olive/slate dark mode, deep teal functional accent)
+
+## Evidence on Hand
+
+- Operational domain packages: `backend/`, `ingestion/`, `indexing/`, `retrieval/`, `generation/`, `kg_security/`
+- Next.js 15 App Router frontend in `frontend/`
+- Documentation and architecture specs in `README.md` and `DEPLOYMENT_SUMMARY.md`
+- Regression test suite in `tests/`
+
+## Product Principles
+
+1. **Status over chrome** — Connectivity, index health, and local model states remain visible at all times.
+2. **Sources are first-class** — Every answer provides inspectable citation provenance and similarity scores.
+3. **Dense, calm productivity** — Maximum information density and clarity without decorative distractions.
+4. **Honest empty and error states** — Explicit diagnostics for offline, unindexed, or disconnected states; never fake generation success.
+5. **Local-first integrity** — Privacy and zero external data leakage are absolute product invariants.
+
+## Accessibility & Inclusion
+
+- WCAG AA contrast compliance (≥ 4.5:1 for body and essential labels across light and dark themes)
+- Full keyboard operability for chat composer, navigation, and source inspection
+- ARIA live regions for background indexing status and token streaming

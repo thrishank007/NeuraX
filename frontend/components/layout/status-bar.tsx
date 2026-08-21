@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { api, ApiClientError } from "@/lib/api";
+import { api, ApiClientError, isAbortError } from "@/lib/api";
 import type { ModelsStatus, SystemStatus } from "@/types/api";
-import { StatusChip, mapSystemKind } from "@/components/status/status-chip";
+import { cn } from "@/lib/utils";
 
 export function StatusBar() {
   const [system, setSystem] = useState<SystemStatus | null>(null);
@@ -12,26 +12,29 @@ export function StatusBar() {
 
   useEffect(() => {
     let cancelled = false;
-    const controller = new AbortController();
+    let active: AbortController | null = null;
 
     async function load() {
+      active?.abort();
+      const controller = new AbortController();
+      active = controller;
       try {
         const [s, m] = await Promise.all([
           api.systemStatus(controller.signal),
           api.modelsStatus(controller.signal),
         ]);
-        if (cancelled) return;
+        if (cancelled || controller.signal.aborted) return;
         setSystem(s);
         setModels(m);
         setBackendError(null);
       } catch (err) {
-        if (cancelled) return;
+        if (cancelled || isAbortError(err) || controller.signal.aborted) return;
         setSystem(null);
         setModels(null);
         setBackendError(
           err instanceof ApiClientError
             ? err.message
-            : "Backend unavailable",
+            : "Backend offline",
         );
       }
     }
@@ -40,7 +43,7 @@ export function StatusBar() {
     const id = window.setInterval(load, 15000);
     return () => {
       cancelled = true;
-      controller.abort();
+      active?.abort();
       window.clearInterval(id);
     };
   }, []);
@@ -48,46 +51,25 @@ export function StatusBar() {
   const docs = system?.collection?.total_documents ?? null;
 
   return (
-    <div
-      className="flex flex-wrap items-center gap-2 border-b border-border bg-surface-2/60 px-3 py-1.5"
-      role="status"
-      aria-live="polite"
-    >
+    <div className="flex items-center gap-2 text-xs">
       {backendError ? (
-        <StatusChip kind="unavailable" label="Backend unavailable" />
+        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-signal-rose/10 border border-signal-rose/20 text-signal-rose text-xs font-medium">
+          <span className="h-1.5 w-1.5 rounded-full bg-signal-rose" />
+          <span>Backend Offline</span>
+        </div>
       ) : (
-        <>
-          <StatusChip
-            kind={mapSystemKind(system?.backend || "loading")}
-            label="Backend ready"
-          />
-          <StatusChip
-            kind={mapSystemKind(system?.vector_store || "unknown")}
-            label={`Index: ${docs == null ? "…" : `${docs} docs`}`}
-          />
-          <StatusChip
-            kind={
-              models?.lm_studio_reachable
-                ? models.models_loaded > 0
-                  ? "ok"
-                  : "degraded"
-                : "unavailable"
-            }
-            label={
-              models?.lm_studio_reachable
-                ? models.models_loaded > 0
-                  ? `LM Studio: ${models.models_loaded} model(s)`
-                  : "LM Studio: no model loaded"
-                : "LM Studio unavailable"
-            }
-          />
-          {system?.offline_mode && (
-            <StatusChip kind="offline" label="Offline mode" />
-          )}
-        </>
-      )}
-      {backendError && (
-        <span className="text-xs text-danger">{backendError}</span>
+        <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-surface-2 border border-border text-xs text-muted">
+          <span className="h-1.5 w-1.5 rounded-full bg-accent animate-pulse-dot" />
+          <span className="text-text font-medium">Air-Gapped</span>
+          <span className="text-border mx-0.5">•</span>
+          <span className="font-medium">{docs == null ? "…" : `${docs} docs`}</span>
+          <span className="text-border mx-0.5">•</span>
+          <span className={cn("font-medium", models?.lm_studio_reachable ? "text-accent" : "text-signal-amber")}>
+            {models?.lm_studio_reachable
+              ? `${models.models_loaded} model${models.models_loaded === 1 ? "" : "s"}`
+              : "LM Studio off"}
+          </span>
+        </div>
       )}
     </div>
   );

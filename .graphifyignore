@@ -1,0 +1,4 @@
+# Graphify corpus is inside data/graphify — override the .gitignore rule
+# that excludes it from version control so graphify's detect can scan it.
+!data/graphify/**
+!data/graphify/.gitkeep

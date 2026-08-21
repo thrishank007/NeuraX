@@ -1,80 +1,64 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { ChevronDown, ChevronRight, HelpCircle } from "lucide-react";
 
 export function HelpPanel({ defaultOpen = false }: { defaultOpen?: boolean }) {
   const [open, setOpen] = useState(defaultOpen);
 
   return (
-    <section className="rounded-lg border border-border bg-surface">
+    <section className="rounded-lg border border-border bg-surface shadow-2xs overflow-hidden">
       <button
         type="button"
-        className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm font-medium"
+        className="flex w-full items-center justify-between px-4 py-3 text-left text-xs font-semibold text-text uppercase tracking-wider font-mono hover:bg-surface-2 transition-colors cursor-pointer"
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
       >
+        <div className="flex items-center gap-2">
+          <HelpCircle className="h-4 w-4 text-accent" />
+          <span>Operator Manual &amp; Directives</span>
+        </div>
         {open ? (
-          <ChevronDown className="h-4 w-4 shrink-0" aria-hidden />
+          <ChevronDown className="h-4 w-4 text-dim" aria-hidden />
         ) : (
-          <ChevronRight className="h-4 w-4 shrink-0" aria-hidden />
+          <ChevronRight className="h-4 w-4 text-dim" aria-hidden />
         )}
-        Help &amp; instructions
       </button>
+
       {open && (
-        <div className="space-y-3 border-t border-border px-3 py-3 text-xs leading-relaxed text-muted">
-          <div>
-            <h3 className="font-medium text-text">Documents</h3>
-            <ol className="mt-1 list-decimal space-y-0.5 pl-4">
-              <li>Upload PDF, DOCX, DOC, TXT, images, or audio</li>
-              <li>Wait for indexing progress to complete</li>
-              <li>Confirm files appear in the collection inventory</li>
+        <div className="space-y-4 border-t border-border-subtle p-4 text-xs leading-relaxed text-muted bg-surface-2/40">
+          <div className="space-y-1">
+            <h3 className="font-semibold text-text font-mono text-[11px] uppercase text-accent">
+              01. Document Ingestion Protocol
+            </h3>
+            <ol className="list-decimal space-y-0.5 pl-4 font-mono text-[11px] text-text/90">
+              <li>Drop PDF, DOCX, TXT, images (OCR), or audio files (Whisper).</li>
+              <li>Monitor real-time chunking and vectorization progress bar.</li>
+              <li>Review indexed items in the collection inventory table.</li>
             </ol>
           </div>
-          <div>
-            <h3 className="font-medium text-text">Search</h3>
-            <ul className="mt-1 list-disc space-y-0.5 pl-4">
+
+          <div className="space-y-1">
+            <h3 className="font-semibold text-text font-mono text-[11px] uppercase text-signal-cyan">
+              02. Multimodal Search vs. Chat Briefing
+            </h3>
+            <ul className="list-disc space-y-0.5 pl-4 font-mono text-[11px] text-text/90">
               <li>
-                <strong className="text-text">Text</strong> — natural language
-                retrieval only
+                <strong>Multi-Search</strong>: Direct similarity vector matching across text, CLIP visual embeddings, and audio transcripts without LLM generation.
               </li>
               <li>
-                <strong className="text-text">Image</strong> — visual similarity
-                search
+                <strong>Chat Briefing</strong>: Streaming grounded reasoning powered by local LM Studio with verified citation provenance.
               </li>
-              <li>
-                <strong className="text-text">Voice</strong> — STT then text
-                search
-              </li>
-              <li>
-                <strong className="text-text">Multimodal</strong> — text + image
-                combined
-              </li>
-              <li>Lower the similarity threshold if you get no hits</li>
             </ul>
           </div>
-          <div>
-            <h3 className="font-medium text-text">Chat</h3>
-            <p className="mt-1">
-              Generates grounded answers from retrieved context with citations.
-              Rate responses with the feedback control after an answer.
+
+          <div className="space-y-1">
+            <h3 className="font-semibold text-text font-mono text-[11px] uppercase text-signal-amber">
+              03. Air-Gapped Security Architecture
+            </h3>
+            <p className="text-[11px] font-mono text-text/90">
+              All vector storage, token generation, and speech/vision processing execute entirely on local hardware (FastAPI + ChromaDB + LM Studio). Zero telemetry, tracking, or external cloud requests.
             </p>
-          </div>
-          <div>
-            <h3 className="font-medium text-text">Formats &amp; limits</h3>
-            <p className="mt-1">
-              Documents: pdf, docx, doc, txt · Images: jpg, png, bmp, tiff, webp
-              · Audio: wav, mp3, m4a, flac, ogg · Default max size 100 MB
-            </p>
-          </div>
-          <div>
-            <h3 className="font-medium text-text">Troubleshooting</h3>
-            <ul className="mt-1 list-disc space-y-0.5 pl-4">
-              <li>Backend unavailable — start FastAPI on port 8000</li>
-              <li>LM Studio unavailable — load a model, enable Local Server</li>
-              <li>Empty answers — index documents first</li>
-              <li>No search hits — lower threshold or rephrase</li>
-            </ul>
           </div>
         </div>
       )}

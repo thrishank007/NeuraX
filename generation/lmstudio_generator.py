@@ -107,7 +107,7 @@ class LMStudioGenerator:
             old_model = self.current_model
             
             # Check if the preferred model is available
-            response = requests.get(f"{self.base_url}/models", timeout=10)
+            response = requests.get(f"{self.base_url}/models", timeout=2)
             if response.status_code == 200:
                 models_data = response.json()
                 available_models = [model.get('id', '') for model in models_data.get('data', [])]
@@ -166,9 +166,6 @@ class LMStudioGenerator:
         start_time = time.time()
         
         try:
-            if not context:
-                return self._generate_no_context_response(query, start_time)
-            
             # Prefer Qwen for text-only queries (better reasoning)
             if not self._has_images_in_context(context):
                 self._switch_model("qwen")
@@ -186,16 +183,20 @@ class LMStudioGenerator:
             response_text = self._generate_with_lmstudio(prompt)
             
             # Validate grounding
-            grounding_score = self._validate_response_grounding(response_text, context)
-            
-            # Extract citation needs
-            citations_needed = self._identify_citation_needs(response_text, context)
+            if context:
+                grounding_score = self._validate_response_grounding(response_text, context)
+                citations_needed = self._identify_citation_needs(response_text, context)
+                confidence_score = min(grounding_score, 0.9)
+            else:
+                grounding_score = 0.0
+                citations_needed = []
+                confidence_score = 0.0
             
             processing_time = time.time() - start_time
             
             return GeneratedResponse(
                 response_text=response_text,
-                confidence_score=min(grounding_score, 0.9),
+                confidence_score=confidence_score,
                 processing_time=processing_time,
                 context_used=context,
                 grounding_score=grounding_score,
@@ -228,9 +229,6 @@ class LMStudioGenerator:
             # Switch to Gemma for multimodal capabilities
             self._switch_model("gemma")
             
-            if not context:
-                return self._generate_no_context_response(query, start_time)
-            
             # Prepare context for generation
             context_text = self._prepare_context(context)
             
@@ -241,16 +239,20 @@ class LMStudioGenerator:
             response_text = self._generate_multimodal_with_lmstudio(messages)
             
             # Validate grounding
-            grounding_score = self._validate_response_grounding(response_text, context)
-            
-            # Extract citation needs
-            citations_needed = self._identify_citation_needs(response_text, context)
+            if context:
+                grounding_score = self._validate_response_grounding(response_text, context)
+                citations_needed = self._identify_citation_needs(response_text, context)
+                confidence_score = min(grounding_score + 0.1, 0.95)
+            else:
+                grounding_score = 0.0
+                citations_needed = []
+                confidence_score = 0.0
             
             processing_time = time.time() - start_time
             
             return GeneratedResponse(
                 response_text=response_text,
-                confidence_score=min(grounding_score + 0.1, 0.95),  # Slight boost for multimodal
+                confidence_score=confidence_score,
                 processing_time=processing_time,
                 context_used=context,
                 grounding_score=grounding_score,
@@ -295,6 +297,15 @@ class LMStudioGenerator:
     
     def _create_grounded_prompt(self, query: str, context_text: str) -> str:
         """Create a grounded prompt for text-only generation"""
+        if not context_text:
+            system_message = (
+                "You are NeuraX, a helpful and polite AI assistant. "
+                "Answer the user's query clearly and conversationally. "
+                "If the user asks a specific question about documents or facts not provided, clearly mention that no relevant documents were found in the index."
+            )
+            user_message = query
+            return f"System: {system_message}\n\nUser: {user_message}\n\nAssistant:"
+
         # Determine which model prompt format to use
         if self.current_model and 'qwen' in self.current_model.lower():
             # Qwen format (thinking mode)
@@ -331,22 +342,32 @@ class LMStudioGenerator:
     def _create_multimodal_messages(self, query: str, context_text: str, 
                                   image: Optional[Union[str, Image.Image]]) -> List[Dict]:
         """Create messages for multimodal generation"""
-        system_message = """You are a helpful AI assistant that can analyze both text documents and images. 
+        if not context_text:
+            system_message = """You are NeuraX, a helpful AI assistant that can analyze images. 
+Provide accurate answers based on what you see in the image and general knowledge."""
+            user_content: List[Dict[str, Any]] = [
+                {
+                    "type": "text",
+                    "text": query
+                }
+            ]
+        else:
+            system_message = """You are a helpful AI assistant that can analyze both text documents and images. 
 Provide accurate answers based only on the provided documents and what you can see in the image.
 If the documents or image don't contain enough information to answer the question, clearly state what information is missing.
 Always ground your responses in the provided context and visual content."""
-        
-        user_content: List[Dict[str, Any]] = [
-            {
-                "type": "text", 
-                "text": f"""Documents:
+            
+            user_content: List[Dict[str, Any]] = [
+                {
+                    "type": "text", 
+                    "text": f"""Documents:
 {context_text}
 
 Question: {query}
 
 Please answer based on both the documents and the image provided."""
-            }
-        ]
+                }
+            ]
         
         # Add image if provided
         if image:
@@ -404,9 +425,12 @@ Please answer based on both the documents and the image provided."""
                 logger.error(f"LM Studio API error: {response.status_code} - {response.text}")
                 return "I apologize, but I encountered an error while generating a response."
                 
+        except requests.exceptions.ConnectionError:
+            logger.error("Could not connect to LM Studio at localhost:1234")
+            return "LM Studio is unreachable at http://localhost:1234/v1. Please start LM Studio with a model loaded, or switch to Cloud mode in the header above."
         except requests.exceptions.Timeout:
             logger.error("Request to LM Studio timed out")
-            return "I apologize, but the response generation timed out. Please try again."
+            return "The request to LM Studio timed out. Please check that your model in LM Studio is running and responding."
         except Exception as e:
             logger.error(f"Error in LM Studio generation: {e}")
             return "I apologize, but I encountered an error while generating a response."
@@ -443,12 +467,15 @@ Please answer based on both the documents and the image provided."""
                 logger.error(f"LM Studio multimodal API error: {response.status_code} - {response.text}")
                 return "I apologize, but I encountered an error while generating a multimodal response."
                 
+        except requests.exceptions.ConnectionError:
+            logger.error("Could not connect to LM Studio at localhost:1234")
+            return "LM Studio is unreachable at http://localhost:1234/v1. Please start LM Studio with a model loaded, or switch to Cloud mode in the header above."
         except requests.exceptions.Timeout:
             logger.error("Multimodal request to LM Studio timed out")
-            return "I apologize, but the multimodal response generation timed out. Please try again."
+            return "The multimodal request to LM Studio timed out. Please check that your model in LM Studio is running and responding."
         except Exception as e:
             logger.error(f"Error in LM Studio multimodal generation: {e}")
-            return "I apologize, but I encountered an error while generating a multimodal response."
+            return "I apologize, but I encountered an error while generating a response."
     
     def _generate_no_context_response(self, query: str, start_time: float) -> GeneratedResponse:
         """Generate response when no context is available"""

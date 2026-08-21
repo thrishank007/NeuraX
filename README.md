@@ -58,7 +58,8 @@ ChromaDB · embeddings · Whisper · CLIP · LM Studio
 - **ChromaDB**: Persistent vector database for semantic search
 - **CLIP Embeddings**: Visual-text cross-modal understanding
 - **Whisper STT**: Speech-to-text for audio processing
-- **NetworkX**: Knowledge graph with security monitoring
+- **NetworkX**: Security-focused knowledge graph (anomaly / tamper monitoring)
+- **Graphify (optional)**: Document knowledge graph for corpus intelligence (CLI integration)
 - **FastAPI**: Thin HTTP API over domain modules
 - **Next.js UI**: Primary workspace (Chat, Documents, Sources, Graph, Settings)
 - **Streamlit Dashboard**: Optional analytics only
@@ -81,6 +82,7 @@ ChromaDB · embeddings · Whisper · CLIP · LM Studio
 - **LM Studio**: For local LLM hosting (Gemma 3n + Qwen3 4B)
 - **Tesseract OCR**: For document text extraction (auto-bundled)
 - **FFmpeg**: For audio processing (platform-specific installation)
+- **Graphify (optional)**: Document knowledge graph CLI — see [Knowledge Graph (Graphify)](#-knowledge-graph-graphify-document-intelligence)
 
 ## 🚀 Quick Start
 
@@ -127,6 +129,112 @@ pwsh scripts/dev.ps1
 | Streamlit (optional) | http://127.0.0.1:8501 |
 
 Environment templates: [`.env.example`](.env.example), [`frontend/.env.local.example`](frontend/.env.local.example).
+
+## 🕸️ Knowledge Graph (Graphify document intelligence)
+
+NeuraX has **two different graph layers**. They are not interchangeable.
+
+| Layer | Module | Purpose |
+|---|---|---|
+| **Security graph** | `kg_security/knowledge_graph_manager.py` (NetworkX) | Anomaly detection, tamper monitoring, security analytics |
+| **Document graph** | `kg_security/graphify_service.py` + Graphify CLI | Build / query a knowledge graph over uploaded documents |
+
+The product **Knowledge Graph** page (`/graph`) is the Graphify document-intelligence UI. The security graph remains available for analytics/export and is **not** removed or renamed.
+
+### Why Graphify is optional
+
+- NeuraX supports older Python runtimes in some deployments.
+- Graphify (`graphifyy`) requires **Python 3.10+**.
+- Therefore Graphify is **never** a mandatory import-time dependency.
+- NeuraX talks to Graphify only through its **installed CLI** (`subprocess`, never `shell=True`).
+- If Graphify is missing, NeuraX still launches; the UI shows install guidance.
+
+### Install Graphify (separate from NeuraX)
+
+```bash
+# Recommended: isolated tool install
+uv tool install "graphifyy[openai]"
+# or
+pipx install "graphifyy[openai]"
+```
+
+Verify:
+
+```bash
+graphify --version
+graphify extract --help
+```
+
+Optional: point NeuraX at a custom binary:
+
+```bash
+# Windows PowerShell
+$env:GRAPHIFY_EXECUTABLE = "C:\path\to\graphify.exe"
+```
+
+### LM Studio setup for Graphify
+
+Graphify semantic extraction uses the same local OpenAI-compatible endpoint as NeuraX:
+
+1. Start LM Studio and serve a chat model (e.g. Qwen) on `http://localhost:1234/v1`.
+2. NeuraX sets `OPENAI_BASE_URL`, `OPENAI_API_KEY`, and `OPENAI_MODEL` for Graphify child processes.
+3. By default only **loopback** endpoints are allowed (`localhost`, `127.0.0.1`, `::1`).
+
+### Configuration (`GRAPHIFY_CONFIG` in `config.py`)
+
+| Key | Meaning |
+|---|---|
+| `enabled` | Master switch for Graphify integration |
+| `executable` / `GRAPHIFY_EXECUTABLE` | CLI name or absolute path |
+| `workspace_dir` | `data/graphify/` managed workspaces |
+| `base_url` | LM Studio OpenAI-compatible base URL |
+| `api_key` / `GRAPHIFY_OPENAI_API_KEY` | Dummy local key (default `lm-studio`) |
+| `model` / `GRAPHIFY_MODEL` | Model id for extraction |
+| `mode` | e.g. `deep` when supported by CLI |
+| `auto_update_after_ingestion` | If true, run incremental update after upload batch |
+| `max_concurrency` | Passed to extract when supported |
+| `api_timeout_seconds` / `process_timeout_seconds` | Timeouts |
+| `allow_non_local_endpoint` | Must be true to allow non-loopback model URLs |
+| `max_rag_context_*` | Caps for optional graph-enhanced RAG |
+
+### Workflow
+
+1. Upload documents in the **Documents** page (vector indexing runs as usual).
+2. Successfully processed files are copied into a **managed Graphify corpus** under `data/graphify/default/corpus/` (sanitized names, SHA-256 manifest, no path traversal).
+3. Open **Knowledge Graph** and choose:
+   - **Build Knowledge Graph** — extract from corpus
+   - **Update Knowledge Graph** — incremental update when available
+   - **Rebuild From Scratch** — clear artifacts and re-extract
+4. View stats, filter by type/community/source/confidence, run **query / explain / path**.
+5. Download artifacts: `graph.html`, `graph.json`, `GRAPH_REPORT.md`.
+6. In **Chat**, optionally enable **Use Knowledge Graph Context** to append compact graph relationships to vector RAG (never replaces ChromaDB retrieval). Inferred edges are labeled `EXTRACTED` / `INFERRED` / `AMBIGUOUS`.
+
+### Offline / privacy
+
+- Graph builds call **local** LM Studio only (default).
+- Corpus and artifacts stay under `data/graphify/` (gitignored).
+- No Graphify package code is imported into core NeuraX modules.
+
+### Troubleshooting
+
+| Symptom | What to do |
+|---|---|
+| Graphify executable not found | Install with `uv tool install "graphifyy[openai]"` or `pipx install "graphifyy[openai]"`; ensure `graphify` is on `PATH` or set `GRAPHIFY_EXECUTABLE` |
+| Unsupported Python for Graphify | Use Python 3.10+ for the Graphify tool only; NeuraX can keep an older runtime |
+| LM Studio unavailable | Start LM Studio server on the configured base URL; load a chat model |
+| Empty graph | Ensure corpus has files (upload + process documents first), then rebuild |
+| Graph build timeout | Increase `process_timeout_seconds` / `api_timeout_seconds`; reduce corpus size or concurrency |
+| Corrupted `graph.json` | Rebuild from scratch; check disk space and LM Studio logs |
+
+### Tests
+
+```bash
+# Graphify unit + integration (uses a fake CLI; Graphify package not required)
+pytest tests/test_graphify_service.py tests/test_graphify_regression.py -q
+
+# Existing API suite
+pytest backend/tests -q
+```
 
 ### Option 2: Manual Installation
 ```bash

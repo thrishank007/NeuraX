@@ -69,55 +69,136 @@ def save_upload(filename: str, data: bytes) -> Path:
 
 
 def _embed_and_store(registry: ComponentRegistry, result: dict) -> Optional[str]:
-    embedding_manager, vector_store, _ = registry.ensure_vector_stack()
-    if result.get("file_type") == "image":
-        text = result.get("ocr_text") or result.get("content")
-        if text:
-            emb = embedding_manager.embed_text(text)
-            if emb is not None and getattr(emb, "size", 0):
-                result["text_embedding"] = emb[0]
-                result["embedding_type"] = result.get("embedding_type") or "text"
-    elif result.get("file_type") == "audio":
-        text = result.get("transcription")
-        if text:
-            emb = embedding_manager.embed_text(text)
-            if emb is not None and getattr(emb, "size", 0):
-                result["text_embedding"] = emb[0]
-                result["embedding_type"] = result.get("embedding_type") or "text"
-    else:
-        content = result.get("content")
-        if content:
-            emb = embedding_manager.embed_text(content)
-            if emb is not None and getattr(emb, "size", 0):
-                result["text_embedding"] = emb[0]
-                result["embedding_type"] = result.get("embedding_type") or "text"
+    """Chunk text documents, embed each chunk, upsert with deterministic IDs.
 
-    if "text_embedding" not in result:
+    Non-text modalities (image OCR, audio transcription) are still stored as
+    a single embedding — chunking them is future work once we have enough
+    content to measure benefit.
+    """
+    from indexing.text_chunker import chunk_document, deterministic_chunk_id
+
+    embedding_manager, vector_store, _ = registry.ensure_vector_stack()
+    embedding_model = embedding_manager.text_embedding_model
+    embedding_dim = embedding_manager.text_embedding_dimension
+
+    file_type = result.get("file_type", "")
+
+    # ── Non-text modalities: CLIP image vector store (512-d) ────────────────
+    if file_type == "image":
+        file_path = str(result.get("file_path", ""))
+        emb = embedding_manager.embed_image(file_path)
+        if emb is None or not getattr(emb, "size", 0):
+            raise ValueError(f"Failed to generate CLIP embedding for {file_path}")
+
+        image_vs = registry.ensure_image_vector_stack()
+        from indexing.text_chunker import deterministic_chunk_id
+        chunk_id = deterministic_chunk_id(file_path, 0, "clip-vit-base-patch32")
+
+        ocr_text = str(result.get("ocr_text") or "").strip()
+        doc_text = ocr_text if ocr_text else f"Image: {Path(file_path).name}"
+
+        meta = {
+            "file_path": file_path,
+            "file_type": "image",
+            "embedding_type": "image",
+            "embedding_provider": "clip",
+            "embedding_model": "openai/clip-vit-base-patch32",
+        }
+        image_vs.collection.upsert(
+            ids=[chunk_id],
+            embeddings=[emb[0].tolist()],
+            metadatas=[meta],
+            documents=[doc_text[:1000]],
+        )
+        logger.info(f"Indexed image file to CLIP image store: {file_path}")
+        return chunk_id
+
+    if file_type == "audio":
+        text = str(result.get("transcription") or "").strip()
+        if not text:
+            text = f"Audio: {Path(result.get('file_path', '')).name}"
+        emb = embedding_manager.embed_text(text)
+        if emb is None or not getattr(emb, "size", 0):
+            raise ValueError("No embeddable content extracted from audio")
+
+        image_vs = registry.ensure_image_vector_stack()
+        file_path = str(result.get("file_path", ""))
+        from indexing.text_chunker import deterministic_chunk_id
+        chunk_id = deterministic_chunk_id(file_path, 0, embedding_manager.text_embedding_model)
+
+        meta = {
+            "file_path": file_path,
+            "file_type": "audio",
+            "embedding_type": "text",
+            "embedding_provider": "nvidia_nim" if embedding_manager.uses_nim_embeddings else "minilm",
+            "embedding_model": embedding_manager.text_embedding_model,
+        }
+        image_vs.collection.upsert(
+            ids=[chunk_id],
+            embeddings=[emb[0].tolist()],
+            metadatas=[meta],
+            documents=[str(text)[:1000]],
+        )
+        logger.info(f"Indexed audio file to image/audio store: {file_path}")
+        return chunk_id
+
+    # ── Text documents: chunk → embed → upsert ──────────────────────────────
+    chunks = chunk_document(result)
+    if not chunks:
         raise ValueError("No embeddable content extracted")
 
-    # Capture ids by counting before/after is fragile; use metadata path match after add
-    before = set()
-    try:
-        existing = vector_store.collection.get(include=["metadatas"])
-        before = set(existing.get("ids") or [])
-    except Exception:
-        before = set()
+    texts = [c["content"] for c in chunks]
+    embeddings = embedding_manager.embed_text(texts)  # batch; passage mode via NIM or MiniLM
 
-    vector_store.add_documents([result], np.array([result["text_embedding"]]))
+    file_path = str(result.get("file_path", ""))
+    doc_metadata = result.get("metadata") or {}
+    ids: list[str] = []
+    chunk_dicts: list[dict] = []
 
+    for i, (chunk, emb) in enumerate(zip(chunks, embeddings)):
+        chunk_id = deterministic_chunk_id(file_path, i, embedding_model)
+        ids.append(chunk_id)
+        chunk_dicts.append({
+            "content": chunk["content"],
+            "file_path": file_path,
+            "file_type": file_type,
+            "embedding_type": "text",
+            "chunk_index": i,
+            "total_chunks": len(chunks),
+            "page": chunk.get("page"),
+            "content_hash": chunk["content_hash"],
+            "embedding_provider": "nvidia_nim" if embedding_manager.uses_nim_embeddings else "minilm",
+            "embedding_model": embedding_model,
+            "embedding_dimension": embedding_dim,
+            # doc-level metadata
+            "title": doc_metadata.get("title", ""),
+            "author": doc_metadata.get("author", ""),
+        })
+
+    # Upsert: delete existing IDs for this file first (handles re-ingest cleanly)
     try:
-        after = vector_store.collection.get(include=["metadatas"])
-        new_ids = [i for i in (after.get("ids") or []) if i not in before]
-        if new_ids:
-            return new_ids[-1]
-        # Fallback: match by file_path
-        file_path = str(result.get("file_path", ""))
-        for i, meta in zip(after.get("ids") or [], after.get("metadatas") or []):
-            if meta and meta.get("file_path") == file_path:
-                return i
+        existing = vector_store.collection.get(
+            where={"file_path": file_path}, include=[]
+        )
+        old_ids = existing.get("ids") or []
+        if old_ids:
+            vector_store.collection.delete(ids=old_ids)
+            logger.info(f"Removed {len(old_ids)} old chunk(s) for {file_path} before re-index")
     except Exception as exc:
-        logger.warning(f"Could not resolve new document id: {exc}")
-    return None
+        logger.warning(f"Could not check existing chunks for {file_path}: {exc}")
+
+    # Store all chunks in one call using low-level Chroma API for explicit IDs
+    vector_store.collection.upsert(
+        ids=ids,
+        embeddings=[e.tolist() for e in embeddings],
+        metadatas=[
+            {k: v for k, v in d.items() if k != "content" and isinstance(v, (str, int, float, bool)) and v is not None}
+            for d in chunk_dicts
+        ],
+        documents=[d["content"] for d in chunk_dicts],
+    )
+    logger.info(f"Indexed {len(chunks)} chunk(s) for {file_path}")
+    return ids[0] if ids else None
 
 
 def process_files_job(registry: ComponentRegistry, job: IndexJob, file_paths: List[Path]) -> None:
@@ -126,7 +207,13 @@ def process_files_job(registry: ComponentRegistry, job: IndexJob, file_paths: Li
     job.touch()
     ingestion = registry.ensure_ingestion()
     registry.ensure_vector_stack()
+    graphify = None
+    try:
+        graphify = registry.ensure_graphify()
+    except Exception as exc:
+        logger.warning(f"Graphify not available during ingestion: {exc}")
 
+    corpus_ready = 0
     for i, path in enumerate(file_paths):
         if job.cancel_requested:
             job.status = "cancelled"
@@ -147,6 +234,22 @@ def process_files_job(registry: ComponentRegistry, job: IndexJob, file_paths: Li
                     job.document_ids.append(doc_id)
                 job.processed += 1
                 job.logs.append(f"OK {path.name} ({result.get('file_type', 'unknown')})")
+
+                # Persist a safe copy into the Graphify corpus (non-fatal)
+                if graphify is not None:
+                    try:
+                        entry = graphify.persist_to_corpus(
+                            path,
+                            original_filename=path.name,
+                            file_type=str(result.get("file_type") or ""),
+                        )
+                        corpus_ready += 1
+                        job.logs.append(
+                            f"Graph corpus: {entry.get('message', 'ready')} ({entry.get('stored_filename')})"
+                        )
+                    except Exception as gexc:
+                        logger.warning(f"Graphify corpus copy failed for {path.name}: {gexc}")
+                        job.logs.append(f"Graph corpus skipped for {path.name}: {gexc}")
         except Exception as exc:
             logger.error(f"Indexing error for {path}: {exc}")
             job.errors.append(f"{path.name}: {exc}")
@@ -154,6 +257,26 @@ def process_files_job(registry: ComponentRegistry, job: IndexJob, file_paths: Li
         finally:
             job.progress = (i + 1) / max(len(file_paths), 1)
             job.touch()
+
+    # Optional auto-update after the batch finishes (never rolls back vector indexing)
+    if graphify is not None and corpus_ready > 0:
+        try:
+            auto = bool(getattr(graphify, "config", {}).get("auto_update_after_ingestion", False))
+            if auto:
+                job.logs.append("Auto-updating Graphify knowledge graph...")
+                job.touch()
+                build = graphify.update_graph()
+                if build.success:
+                    job.logs.append("Graphify update completed")
+                else:
+                    job.logs.append(f"Graphify update skipped/failed: {build.message}")
+            else:
+                job.logs.append(
+                    "Files ready for Graphify. Open Knowledge Graph to Build/Update the document graph."
+                )
+        except Exception as exc:
+            logger.warning(f"Graphify auto-update failed (non-fatal): {exc}")
+            job.logs.append(f"Graphify auto-update failed (non-fatal): {exc}")
 
     job.status = "failed" if job.processed == 0 and job.errors else "completed"
     job.progress = 1.0

@@ -25,6 +25,8 @@ def chat_endpoint(
             query=body.query,
             similarity_threshold=body.similarity_threshold,
             max_docs=body.max_docs,
+            use_knowledge_graph=body.use_knowledge_graph,
+            mode=body.mode,
         )
         return ChatResponse(
             query=result["query"],
@@ -35,6 +37,8 @@ def chat_endpoint(
             sources=[SearchResultItem(**s) for s in result["sources"]],
             model_used=result["model_used"],
             lm_studio_available=result["lm_studio_available"],
+            graph_context_used=bool(result.get("graph_context_used", False)),
+            graph_warning=result.get("graph_warning"),
         )
     except ValueError as ve:
         raise APIError("validation_error", str(ve), 400) from ve
@@ -53,6 +57,8 @@ def chat_stream(
             query=body.query,
             similarity_threshold=body.similarity_threshold,
             max_docs=body.max_docs,
+            use_knowledge_graph=body.use_knowledge_graph,
+            mode=body.mode,
         ):
             event = item["event"]
             data = json.dumps(item["data"])

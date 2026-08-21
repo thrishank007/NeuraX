@@ -79,6 +79,31 @@ def build_system_status(registry: ComponentRegistry) -> dict[str, Any]:
     if lm_status == "unavailable":
         overall = "degraded"
 
+    graphify_status: dict[str, Any] = {"available": False, "enabled": False}
+    try:
+        graphify = registry.ensure_graphify()
+        if graphify is not None:
+            st = graphify.get_status()
+            graphify_status = {
+                "available": st.available,
+                "enabled": st.enabled,
+                "version": st.version,
+                "corpus_file_count": st.corpus_file_count,
+                "artifacts_available": st.artifacts_available,
+                "build_running": st.build_running,
+                "model": st.model,
+            }
+    except Exception as exc:
+        graphify_status = {"available": False, "enabled": False, "error": type(exc).__name__}
+
+    from config import CLOUD_LLM_CONFIG
+    cloud_configured = bool(CLOUD_LLM_CONFIG.get("api_url")) and bool(CLOUD_LLM_CONFIG.get("model"))
+    cloud_status = {
+        "configured": cloud_configured,
+        "api_url": CLOUD_LLM_CONFIG.get("api_url", "")[:50] if cloud_configured else "",
+        "model": CLOUD_LLM_CONFIG.get("model", "") if cloud_configured else "",
+    }
+
     return {
         "overall": overall,
         "backend": "ok",
@@ -88,7 +113,9 @@ def build_system_status(registry: ComponentRegistry) -> dict[str, Any]:
         "collection": collection,
         "supported_formats": formats,
         "max_upload_mb": SECURITY_CONFIG.get("max_upload_size_mb", 100),
-        "offline_mode": True,
+        "offline_mode": not cloud_configured,
+        "cloud_llm": cloud_status,
+        "graphify": graphify_status,
     }
 
 

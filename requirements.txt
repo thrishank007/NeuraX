@@ -73,4 +73,4 @@ auto-py-to-exe
 # Development
 pytest
 black
-flake8
+flake8rank-bm25>=0.2.2

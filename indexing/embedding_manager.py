@@ -15,6 +15,8 @@ from tqdm import tqdm
 import os
 
 from error_handler import ErrorHandler, ErrorCategory, ErrorSeverity
+from config import NIM_EMBEDDING_CONFIG
+from indexing.nvidia_nim_embedding_provider import NvidiaNimEmbeddingProvider
 
 
 class EmbeddingManager:
@@ -23,6 +25,10 @@ class EmbeddingManager:
     def __init__(self, device: Optional[str] = None, cache_dir: Optional[str] = None):
         self.device = device or ('cuda' if torch.cuda.is_available() else 'cpu')
         self.error_handler = ErrorHandler()
+        self.nim_embedding_provider = None
+        self.uses_nim_embeddings = NIM_EMBEDDING_CONFIG["enabled"]
+        self.text_embedding_dimension = NIM_EMBEDDING_CONFIG["dimension"] if self.uses_nim_embeddings else 384
+        self.text_embedding_model = NIM_EMBEDDING_CONFIG["model"] if self.uses_nim_embeddings else "all-MiniLM-L6-v2"
         logger.info(f"Using device: {self.device}")
         
         # Initialize models
@@ -40,10 +46,12 @@ class EmbeddingManager:
         
         # Final verification that models are properly loaded
         logger.info("Performing final model verification...")
-        if self.text_model is None:
+        if not self.uses_nim_embeddings and self.text_model is None:
             raise RuntimeError("Text model failed to load")
-        if not hasattr(self.text_model, 'encode'):
+        if not self.uses_nim_embeddings and not hasattr(self.text_model, 'encode'):
             raise RuntimeError(f"Text model is invalid type: {type(self.text_model)}")
+        if self.uses_nim_embeddings and self.nim_embedding_provider is None:
+            raise RuntimeError("NVIDIA NIM embedding provider failed to initialize")
         if self.clip_model is None:
             raise RuntimeError("CLIP model failed to load")
         if self.clip_processor is None:
@@ -99,19 +107,22 @@ class EmbeddingManager:
     def _load_models(self):
         """Load embedding models with error handling"""
         try:
-            # Load text model
-            logger.info("Loading text embedding model...")
-            self.text_model = SentenceTransformer('all-MiniLM-L6-v2')
-            logger.info(f"Text model loaded successfully: {type(self.text_model)}")
-            
-            try:
-                self.text_model = self.text_model.to(self.device)
-                logger.info(f"Text model moved to {self.device}: {type(self.text_model)}")
-            except Exception as device_error:
-                logger.warning(f"Failed to move text model to {self.device}, using CPU: {device_error}")
-                self.device = 'cpu'
-                self.text_model = self.text_model.to(self.device)
-                logger.info(f"Text model moved to CPU: {type(self.text_model)}")
+            if self.uses_nim_embeddings:
+                logger.info(f"Using NVIDIA NIM text embeddings: {self.text_embedding_model}")
+                self.nim_embedding_provider = NvidiaNimEmbeddingProvider(NIM_EMBEDDING_CONFIG)
+            else:
+                logger.info("Loading text embedding model...")
+                self.text_model = SentenceTransformer('all-MiniLM-L6-v2')
+                logger.info(f"Text model loaded successfully: {type(self.text_model)}")
+                
+                try:
+                    self.text_model = self.text_model.to(self.device)
+                    logger.info(f"Text model moved to {self.device}: {type(self.text_model)}")
+                except Exception as device_error:
+                    logger.warning(f"Failed to move text model to {self.device}, using CPU: {device_error}")
+                    self.device = 'cpu'
+                    self.text_model = self.text_model.to(self.device)
+                    logger.info(f"Text model moved to CPU: {type(self.text_model)}")
             
             # Load CLIP model
             logger.info("Loading CLIP model...")
@@ -133,6 +144,8 @@ class EmbeddingManager:
             
         except Exception as e:
             logger.critical(f"Model loading failed: {e}")
+            if self.uses_nim_embeddings:
+                raise
             # Simple CPU fallback without complex error handling
             if self.device != 'cpu':
                 logger.info("Attempting CPU fallback for model loading")
@@ -221,7 +234,7 @@ class EmbeddingManager:
             # Check cache first if enabled
             if use_cache:
                 for i, text in enumerate(texts):
-                    cache_key = self._get_cache_key(text, "text")
+                    cache_key = self._get_cache_key(text, f"text:passage:{self.text_embedding_model}")
                     if cache_key in self._embedding_cache:
                         embeddings_list.append(self._embedding_cache[cache_key])
                     else:
@@ -235,32 +248,25 @@ class EmbeddingManager:
             
             # Generate embeddings for uncached texts
             if uncached_texts:
-                if self.text_model is None:
-                    logger.error("Text embedding model not loaded. Cannot generate embeddings.")
-                    raise RuntimeError("Text embedding model not initialized")
-                
-                # Debug: Check if text_model is the correct type
-                logger.info(f"DEBUG: text_model type: {type(self.text_model)}")
-                logger.info(f"DEBUG: text_model value: {self.text_model}")
-                logger.info(f"DEBUG: text_model has encode: {hasattr(self.text_model, 'encode')}")
-                
-                if not hasattr(self.text_model, 'encode'):
-                    logger.error(f"text_model is not a SentenceTransformer model. Type: {type(self.text_model)}, Value: {self.text_model}")
-                    raise RuntimeError(f"Text model is invalid type: {type(self.text_model)}")
-                
-                new_embeddings = self.text_model.encode(uncached_texts, convert_to_numpy=True)
-                
-                # Standardize dimensions and normalize if requested
-                if normalize:
-                    new_embeddings = np.array([
-                        self._normalize_embedding(self._standardize_embedding_dimension(emb)) 
-                        for emb in new_embeddings
-                    ])
+                if self.uses_nim_embeddings:
+                    new_embeddings = self.nim_embedding_provider.embed_documents(uncached_texts)
                 else:
-                    new_embeddings = np.array([
-                        self._standardize_embedding_dimension(emb) 
-                        for emb in new_embeddings
-                    ])
+                    if self.text_model is None:
+                        logger.error("Text embedding model not loaded. Cannot generate embeddings.")
+                        raise RuntimeError("Text model not initialized")
+                    if not hasattr(self.text_model, 'encode'):
+                        raise RuntimeError(f"Text model is invalid type: {type(self.text_model)}")
+                    new_embeddings = self.text_model.encode(uncached_texts, convert_to_numpy=True)
+                    if normalize:
+                        new_embeddings = np.array([
+                            self._normalize_embedding(self._standardize_embedding_dimension(emb))
+                            for emb in new_embeddings
+                        ])
+                    else:
+                        new_embeddings = np.array([
+                            self._standardize_embedding_dimension(emb)
+                            for emb in new_embeddings
+                        ])
                 
                 # Update cache and results
                 for i, (text, embedding) in enumerate(zip(uncached_texts, new_embeddings)):
@@ -268,7 +274,7 @@ class EmbeddingManager:
                     embeddings_list[idx] = embedding
                     
                     if use_cache:
-                        cache_key = self._get_cache_key(text, "text")
+                        cache_key = self._get_cache_key(text, f"text:passage:{self.text_embedding_model}")
                         self._embedding_cache[cache_key] = embedding
             
             return np.array(embeddings_list)
@@ -276,20 +282,19 @@ class EmbeddingManager:
         except Exception as e:
             logger.error(f"Error generating text embeddings: {e}")
             raise
-    
+
+    def embed_query(self, query: str, normalize: bool = True) -> np.ndarray:
+        """Generate a query embedding without reusing document-mode vectors."""
+        texts = self._prepare_text_inputs(query)
+        if len(texts) != 1:
+            raise ValueError("A search query must contain exactly one non-empty text value")
+        if self.uses_nim_embeddings:
+            return self.nim_embedding_provider.embed_query(texts[0])
+        return self.embed_text(texts[0], normalize=normalize, use_cache=True)
+
     def embed_image(self, images: Union[str, Path, Image.Image, List], 
                    normalize: bool = True, use_cache: bool = True) -> np.ndarray:
-        """
-        Generate embeddings for images using CLIP
-        
-        Args:
-            images: Single image path/PIL Image or list of images
-            normalize: Whether to normalize embeddings for cosine similarity
-            use_cache: Whether to use caching mechanism
-            
-        Returns:
-            Numpy array of embeddings
-        """
+        """Generate embeddings for images using CLIP"""
         if not isinstance(images, list):
             images = [images]
         
@@ -299,7 +304,6 @@ class EmbeddingManager:
             uncached_indices = []
             pil_images = []
             
-            # Convert paths to PIL Images and check cache
             for i, img in enumerate(images):
                 if isinstance(img, (str, Path)):
                     pil_img = Image.open(img)
@@ -312,7 +316,6 @@ class EmbeddingManager:
                 
                 pil_images.append(pil_img)
                 
-                # Check cache
                 if use_cache:
                     cache_key = self._get_cache_key(img_path, "image")
                     if cache_key in self._embedding_cache:
@@ -326,32 +329,22 @@ class EmbeddingManager:
                     uncached_images.append((pil_img, img_path))
                     uncached_indices.append(i)
             
-            # Generate embeddings for uncached images
             if uncached_images:
                 uncached_pil_images = [img[0] for img in uncached_images]
                 
-                # Process images
                 inputs = self.clip_processor(images=uncached_pil_images, return_tensors="pt")
                 inputs = {k: v.to(self.device) for k, v in inputs.items()}
                 
-                # Generate embeddings
                 with torch.no_grad():
                     image_features = self.clip_model.get_image_features(**inputs)
                     new_embeddings = image_features.cpu().numpy()
                 
-                # Standardize dimensions and normalize if requested
                 if normalize:
                     new_embeddings = np.array([
-                        self._normalize_embedding(self._standardize_embedding_dimension(emb)) 
-                        for emb in new_embeddings
-                    ])
-                else:
-                    new_embeddings = np.array([
-                        self._standardize_embedding_dimension(emb) 
+                        self._normalize_embedding(emb)
                         for emb in new_embeddings
                     ])
                 
-                # Update cache and results
                 for i, ((pil_img, img_path), embedding) in enumerate(zip(uncached_images, new_embeddings)):
                     idx = uncached_indices[i]
                     embeddings_list[idx] = embedding
@@ -367,24 +360,13 @@ class EmbeddingManager:
             raise
     
     def embed_multimodal(self, text: str, image: Union[str, Path, Image.Image]) -> Dict[str, np.ndarray]:
-        """
-        Generate multimodal embeddings for text-image pairs
-        
-        Args:
-            text: Text content
-            image: Image path or PIL Image
-            
-        Returns:
-            Dict containing text and image embeddings
-        """
+        """Generate multimodal embeddings for text-image pairs"""
         try:
-            # Convert image if needed
             if isinstance(image, (str, Path)):
                 pil_image = Image.open(image)
             else:
                 pil_image = image
             
-            # Process inputs
             inputs = self.clip_processor(
                 text=[text], 
                 images=[pil_image], 
@@ -393,13 +375,11 @@ class EmbeddingManager:
             )
             inputs = {k: v.to(self.device) for k, v in inputs.items()}
             
-            # Generate embeddings
             with torch.no_grad():
                 outputs = self.clip_model(**inputs)
                 text_embeds = outputs.text_embeds.cpu().numpy()
                 image_embeds = outputs.image_embeds.cpu().numpy()
             
-            # Standardize dimensions for compatibility
             text_embeds_std = self._standardize_embedding_dimension(text_embeds[0])
             image_embeds_std = self._standardize_embedding_dimension(image_embeds[0])
             
@@ -414,32 +394,21 @@ class EmbeddingManager:
             raise
     
     def compute_similarity(self, embedding1: np.ndarray, embedding2: np.ndarray) -> float:
-        """
-        Compute cosine similarity between two embeddings
-        
-        Args:
-            embedding1: First embedding
-            embedding2: Second embedding
-            
-        Returns:
-            Cosine similarity score
-        """
+        """Compute cosine similarity between two embeddings"""
         try:
-            # Normalize embeddings
             norm1 = np.linalg.norm(embedding1)
             norm2 = np.linalg.norm(embedding2)
             
             if norm1 == 0 or norm2 == 0:
                 return 0.0
             
-            # Compute cosine similarity
             similarity = np.dot(embedding1, embedding2) / (norm1 * norm2)
             return float(similarity)
             
         except Exception as e:
             logger.error(f"Error computing similarity: {e}")
             return 0.0
-    
+
     def batch_embed_documents(self, documents: List[Dict], show_progress: bool = True) -> List[Dict]:
         """
         Generate embeddings for a batch of processed documents with progress indicators
