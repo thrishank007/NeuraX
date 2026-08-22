@@ -11,12 +11,20 @@ def _split_text(text: str, chunk_size: int, overlap: int) -> list[str]:
 
     Boundary preference (most to least preferred):
       paragraph break → sentence end → word boundary → hard cut
+
+    A boundary is only accepted when it lies at least ``min_len`` past the
+    chunk start.  Without that floor, a boundary just ahead of ``start``
+    (e.g. the tail of the previous cut, or a long unpunctuated run) is
+    re-found on every iteration and the window crawls forward one character
+    at a time, emitting near-duplicate slivers of the same sentence.
     """
     text = text.strip()
     if not text:
         return []
     if len(text) <= chunk_size:
         return [text]
+
+    min_len = max(1, min(chunk_size // 2, chunk_size - overlap))
 
     chunks: list[str] = []
     start = 0
@@ -27,23 +35,26 @@ def _split_text(text: str, chunk_size: int, overlap: int) -> list[str]:
             break
 
         # Try to cut at a paragraph break
-        cut = text.rfind("\n\n", start, end)
+        cut = text.rfind("\n\n", start + min_len, end)
         if cut == -1 or cut <= start:
             # Sentence boundary (. ! ?)
             m = None
-            for m in re.finditer(r"[.!?]\s+", text[start:end]):
+            for m in re.finditer(r"[.!?]\s+", text[start + min_len : end]):
                 pass  # walk to the last match
-            cut = (start + m.end()) if m else -1
+            cut = (start + min_len + m.end()) if m else -1
 
         if cut == -1 or cut <= start:
             # Word boundary
-            cut = text.rfind(" ", start, end)
+            cut = text.rfind(" ", start + min_len, end)
 
         if cut == -1 or cut <= start:
             cut = end  # hard cut
 
         chunks.append(text[start:cut].strip())
-        start = max(start + 1, cut - overlap)
+        # Advance past the cut, keeping up to ``overlap`` chars of context.
+        # When the chunk is shorter than the overlap, honour progress over
+        # overlap so the window can never stall (or crawl) on the same cut.
+        start = min(cut, max(start + 1, cut - overlap))
 
     return [c for c in chunks if c]
 
@@ -85,12 +96,16 @@ def chunk_document(result: dict[str, Any], chunk_size: int = 800, overlap: int =
 
     # Flatten into chunks, carrying the page of the section that started each chunk
     chunks: list[dict[str, Any]] = []
+    seen_hashes: set[str] = set()
     chunk_index = 0
     for section_text, page in raw_sections:
         for piece in _split_text(section_text, chunk_size, overlap):
             if not piece:
                 continue
             content_hash = hashlib.sha256(piece.encode()).hexdigest()
+            if content_hash in seen_hashes:
+                continue  # repeated header/footer-style sections carry no new signal
+            seen_hashes.add(content_hash)
             chunk: dict[str, Any] = {
                 "content": piece,
                 "chunk_index": chunk_index,
