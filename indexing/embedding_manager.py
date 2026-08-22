@@ -6,7 +6,8 @@ from sentence_transformers import SentenceTransformer
 from transformers import CLIPProcessor, CLIPModel
 from PIL import Image
 import numpy as np
-from typing import List, Dict, Union, Optional
+from collections import OrderedDict
+from typing import Any, List, Dict, Union, Optional
 from loguru import logger
 from pathlib import Path
 import pickle
@@ -17,6 +18,35 @@ import os
 from error_handler import ErrorHandler, ErrorCategory, ErrorSeverity
 from config import NIM_EMBEDDING_CONFIG
 from indexing.nvidia_nim_embedding_provider import NvidiaNimEmbeddingProvider
+
+
+class _LruCache:
+    """Bounded LRU for embedding vectors.
+
+    ~8KB per 2048-d float32 vector; 4096 entries ≈ 34MB, so an unbounded
+    dict would quietly eat memory on long-running servers with unique
+    passages/queries.
+    """
+
+    def __init__(self, maxsize: int = 4096) -> None:
+        self._data: "OrderedDict[str, Any]" = OrderedDict()
+        self.maxsize = maxsize
+
+    def __contains__(self, key: str) -> bool:
+        return key in self._data
+
+    def __getitem__(self, key: str) -> Any:
+        self._data.move_to_end(key)
+        return self._data[key]
+
+    def __setitem__(self, key: str, value: Any) -> None:
+        self._data[key] = value
+        self._data.move_to_end(key)
+        while len(self._data) > self.maxsize:
+            self._data.popitem(last=False)
+
+    def __len__(self) -> int:
+        return len(self._data)
 
 
 class EmbeddingManager:
@@ -40,7 +70,7 @@ class EmbeddingManager:
         # Setup caching
         self.cache_dir = Path(cache_dir) if cache_dir else Path("cache/embeddings")
         self.cache_dir.mkdir(parents=True, exist_ok=True)
-        self._embedding_cache = {}
+        self._embedding_cache = _LruCache(maxsize=4096)
         
         self._load_models()
         
@@ -289,7 +319,14 @@ class EmbeddingManager:
         if len(texts) != 1:
             raise ValueError("A search query must contain exactly one non-empty text value")
         if self.uses_nim_embeddings:
-            return self.nim_embedding_provider.embed_query(texts[0])
+            # Query embeds cost a full API round-trip (~1s p50) — cache them
+            # keyed separately from passage vectors (different input_type).
+            cache_key = self._get_cache_key(texts[0], f"text:query:{self.text_embedding_model}")
+            if cache_key in self._embedding_cache:
+                return self._embedding_cache[cache_key]
+            embedding = self.nim_embedding_provider.embed_query(texts[0])
+            self._embedding_cache[cache_key] = embedding
+            return embedding
         return self.embed_text(texts[0], normalize=normalize, use_cache=True)
 
     def embed_image(self, images: Union[str, Path, Image.Image, List], 
