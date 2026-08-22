@@ -39,8 +39,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     const stored = localStorage.getItem("neurax-theme");
     const preferDark =
       stored === "dark" ||
-      (!stored && window.matchMedia("(prefers-color-scheme: dark)").matches) ||
-      true;
+      (!stored && window.matchMedia("(prefers-color-scheme: dark)").matches);
     setDark(preferDark);
     document.documentElement.classList.toggle("dark", preferDark);
   }, []);

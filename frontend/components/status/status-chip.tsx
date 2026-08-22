@@ -1,10 +1,3 @@
-import {
-  AlertCircle,
-  CheckCircle2,
-  CircleDashed,
-  Loader2,
-  WifiOff,
-} from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
 export type StatusKind =
