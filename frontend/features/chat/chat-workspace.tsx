@@ -176,6 +176,16 @@ export function ChatWorkspace() {
           }
         } else if (evt.event === "retrieval") {
           sources = (evt.data.sources as SearchResultItem[]) || [];
+        } else if (evt.event === "token") {
+          // Incremental streaming delta — append to the in-progress answer.
+          responseText += String(evt.data.delta || "");
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === assistantId
+                ? { ...m, content: responseText, status: "streaming" }
+                : m,
+            ),
+          );
         } else if (evt.event === "message") {
           responseText = String(evt.data.response || "");
           confidence = Number(evt.data.confidence || 0);
