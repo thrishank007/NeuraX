@@ -1,0 +1,194 @@
+{
+  "collection": "neurax_eval_synthetic_v1",
+  "generated": "2026-08-22T14:46:32",
+  "corpus_dir": "data\\eval_corpus",
+  "chunks": 58,
+  "queries": [
+    {
+      "query": "What is the primary radio channel of Aurora Station?",
+      "relevant": [
+        "63efed327d3f"
+      ],
+      "class": "keyword"
+    },
+    {
+      "query": "When does the resupply vessel dock at Aurora Station?",
+      "relevant": [
+        "41f691ee160d"
+      ],
+      "class": "keyword"
+    },
+    {
+      "query": "What is the lift capacity of the NC-4 crane at Nagar Bay?",
+      "relevant": [
+        "15c876477b60"
+      ],
+      "class": "keyword"
+    },
+    {
+      "query": "What measles vaccination rate did the Meridian district reach?",
+      "relevant": [
+        "dc9e4dd73fb5"
+      ],
+      "class": "keyword"
+    },
+    {
+      "query": "What is the wingspan of the Kestrel airframe?",
+      "relevant": [
+        "021fea247113"
+      ],
+      "class": "keyword"
+    },
+    {
+      "query": "What valuation cap did Lumen Ventures agree to?",
+      "relevant": [
+        "bf7bf60dce07"
+      ],
+      "class": "keyword"
+    },
+    {
+      "query": "Which tunnel closes during the Silverline engineering work?",
+      "relevant": [
+        "18b398b788c4"
+      ],
+      "class": "keyword"
+    },
+    {
+      "query": "How many attendees can West Gate admit per hour at the festival?",
+      "relevant": [
+        "5ec5775e142e"
+      ],
+      "class": "keyword"
+    },
+    {
+      "query": "How many critical audit findings are still unresolved?",
+      "relevant": [
+        "5056cd71f85d"
+      ],
+      "class": "keyword"
+    },
+    {
+      "query": "Who leads the engineering team at Aurora Station?",
+      "relevant": [
+        "0e86b1b3bf1d"
+      ],
+      "class": "paraphrase"
+    },
+    {
+      "query": "How much fuel remains in the station's tanks?",
+      "relevant": [
+        "41f691ee160d"
+      ],
+      "class": "paraphrase"
+    },
+    {
+      "query": "Who has to approve hazardous cargo before transfer at the port?",
+      "relevant": [
+        "f414b5ed50e2"
+      ],
+      "class": "paraphrase"
+    },
+    {
+      "query": "Where are the temperature-sensitive medicines kept at the clinic?",
+      "relevant": [
+        "bc9d9a9e872d"
+      ],
+      "class": "paraphrase"
+    },
+    {
+      "query": "How high can the drone fly before its software stops it?",
+      "relevant": [
+        "021fea247113"
+      ],
+      "class": "paraphrase"
+    },
+    {
+      "query": "How many board members can the investor appoint?",
+      "relevant": [
+        "09500b074fb0"
+      ],
+      "class": "paraphrase"
+    },
+    {
+      "query": "How frequently do the buses replacing the trains run?",
+      "relevant": [
+        "640426279576"
+      ],
+      "class": "paraphrase"
+    },
+    {
+      "query": "What extra travel time did ships incur from the route change?",
+      "relevant": [
+        "efb4fb039838"
+      ],
+      "class": "paraphrase"
+    },
+    {
+      "query": "How long do festival visitors have to get their money back?",
+      "relevant": [
+        "93e86586f7a2"
+      ],
+      "class": "paraphrase"
+    },
+    {
+      "query": "What share of employees use two-step sign-in at Obsidian Labs?",
+      "relevant": [
+        "15d9236addcd"
+      ],
+      "class": "paraphrase"
+    },
+    {
+      "query": "How large is the marsh frog population estimated to be?",
+      "relevant": [
+        "58ee2e75d212"
+      ],
+      "class": "paraphrase"
+    },
+    {
+      "query": "What battery chemistry does the Kestrel drone use?",
+      "relevant": [
+        "f5bee94ba923"
+      ],
+      "class": "lexical"
+    },
+    {
+      "query": "What email address should volunteer guides contact?",
+      "relevant": [
+        "85d5b65fb086"
+      ],
+      "class": "lexical"
+    },
+    {
+      "query": "Which invasive water plant is spreading through the wetland?",
+      "relevant": [
+        "8c098a86901d"
+      ],
+      "class": "lexical"
+    },
+    {
+      "query": "Does the audit cover multi-factor login for contractors?",
+      "relevant": [
+        "15d9236addcd"
+      ],
+      "class": "lexical"
+    },
+    {
+      "query": "During which hours is the vessel clearance window open at Nagar Bay?",
+      "relevant": [
+        "13450357ded3",
+        "264d0cffee52",
+        "c84d4b951e06"
+      ],
+      "class": "keyword"
+    },
+    {
+      "query": "What is the registration number of Lumen Ventures?",
+      "relevant": [
+        "00ab94ca6eaf",
+        "6092cb5867f9",
+        "af3b009bd830"
+      ],
+      "class": "keyword"
+    }
+  ]
+}

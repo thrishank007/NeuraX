@@ -1,0 +1,29 @@
+Aurora Station Operations Report — Second Quarter 2026
+
+Overview. Aurora Station hosted 38 personnel across the quarter, down from
+41 in Q1 after two scheduled departures. All daily traffic moves over the
+primary radio channel AURORA-7 on 121.65 MHz, with 156.800 MHz retained as
+the emergency fallback. Power generation averaged 94 percent availability
+on the primary diesel array, and the wind turbine contributed a further
+11 percent on windy weeks.
+
+Fuel and logistics. Bulk diesel stands at 61 percent of rated capacity
+after the April resupply, enough for roughly 140 days of normal operations.
+The fuel officer flagged a slow leak at the day-tank manifold; a gasket kit
+arrives with the next vessel. Speaking of which, the next resupply vessel
+is scheduled to dock on September 3, 2026, weather permitting, carrying
+68 tonnes of cargo including the manifold gasket kit, fresh provisions,
+and two replacement snowmobiles.
+
+Staffing. Engineering falls under chief engineer Maren Voss, now in her
+fourth winter rotation; she has asked for an apprentice mechanic to arrive
+no later than October. The medical bay is covered by Dr. Ilya Petrov, who
+rotates out in November. Station leadership is reviewing whether a second
+doctor is justified for the summer season, when transient science parties
+push the population above 50.
+
+Safety. Two near-miss events were logged: a forklift brake fault in the
+cargo tunnel and a brief generator overload during a blizzard. Neither
+resulted in injury. The quarterly safety review is due with the home
+office by July 15, 2026, and the station budget forecast assumes a 4
+percent increase in fuel spend for the coming year.

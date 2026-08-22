@@ -1,0 +1,24 @@
+Obsidian Labs — Internal Security Audit, first half 2026
+
+Identity. MFA enrollment stands at 87 percent of workforce accounts, with
+the remainder concentrated in field contractor roles that lack corporate
+devices. Passwordless sign-in via hardware keys is live for all
+engineering staff. Dormant accounts are now disabled automatically after
+45 days without a login, a control that removed 212 stale identities.
+
+Findings. Three critical findings remain open past their remediation
+deadline: an unencrypted backup volume in the legacy file estate, a
+service account with a non-rotating key, and an overly permissive IAM
+policy on the analytics bucket. The audit committee asked for closure
+plans within 30 days. Medium-severity findings fell from 37 to 22.
+
+Detection and response. The security operations center runs a follow-the-
+sun rota with analysts in Lisbon and Auckland. Mean time to acknowledge
+an alert dropped to 9 minutes, while containment of confirmed incidents
+averages 41 minutes. A tabletop exercise simulating ransomware in the
+build farm is planned for September.
+
+Vendor posture. Sixty-one vendors completed the security questionnaire;
+nine were placed on a watch list. The data protection officer approved
+two new sub-processors for the support platform. Annual security training
+completion is at 94 percent company-wide.

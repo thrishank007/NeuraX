@@ -1,0 +1,27 @@
+KESTREL UAS FLIGHT OPERATIONS SPECIFICATION REV C
+
+Airframe and performance summary
+ wingspan of 3.4 meters with a carbon-fiber spar joined at the root
+ hardpoints rated at 6 kg total payload split across two wing pylons
+ airframe empty mass 9.7 kg max takeoff mass 21.5 kg
+ launch by pneumatic rail recovery by belly skid or 30 m arresting line
+ flight controller enforces a hard ceiling of 4,800 meters above launch
+ true airspeed 26 m/s cruise 34 m/s maximum in clean configuration
+ endurance 96 minutes at optimal glide ratio with a light sensor load
+
+Power system
+ battery pack uses lithium-ion cells in a 12S2P arrangement 44.4 V nominal
+ sustained current draw 18 A at cruise with payload avionics online
+ cold-weather kit keeps the pack above 5 degrees C for arctic deployments
+ spare packs recharge in 70 minutes on the dual-bay ground charger
+
+Sensors and datalink
+ standard fit is a 5-band multispectral camera on a stabilized gimbal
+ optional thermal pod replaces the multispectral unit within minutes
+ line-of-sight datalink reaches 42 km with the tracking antenna array
+ lost-link behavior is a loiter climb then autonomous return to launch
+
+Crewing and limits
+ operations require a rated pilot plus one observer for beyond-visual work
+ crosswind limit for rail launch is 8 m/s gusts included
+ icing flight is prohibited the airframe carries no ice protection

@@ -1,0 +1,23 @@
+Atlas Components — Supply Chain Quarterly Review, Q2 FY2026
+
+Network posture. Ocean freight normalized after a volatile first quarter,
+though the cape rerouting added five weeks of transit on the Europe–Asia
+lane and pushed quarterly air-freight spend up by 31 percent. Contract
+rates for the next two quarters are locked with two carriers, covering
+about 70 percent of planned volume.
+
+Supplier base. Concentration remains the top risk: 41 percent of sourced
+components trace to a single vendor, Hoshino Precision, whose Kobe plant
+is still rebuilding after the spring earthquake. A second source for the
+actuator line is being qualified, with an audit visit booked for August.
+The vendor scorecard now weights dual-sourcing progress at 15 percent.
+
+Systems. The planning team shipped a multi-modal freight dashboard that
+joins ocean, air, and rail telemetry into one lane view; early users
+report cut-and-paste work dropping by half. Warehouse automation at the
+Dulles distribution center reached phase two, with goods-to-person pickers
+live on six aisles. Inventory turns improved from 4.1 to 4.6.
+
+Outlook. Management expects component lead times to ease through the fall
+but keeps a 65-day safety stock on long-tail electronic parts. The
+quarter's backlog stood at 214 million dollars, book-to-bill 1.08.
