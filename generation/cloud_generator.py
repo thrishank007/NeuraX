@@ -191,15 +191,17 @@ class CloudGenerator:
 
         parts: list[str] = []
         model_used = self.model
-        resp = requests.post(
-            f"{self.api_url}/chat/completions",
-            headers=headers,
-            json=payload,
-            timeout=self.timeout,
-            stream=True,
-        )
-        resp.raise_for_status()
+        error_message: Optional[str] = None
+        resp = None
         try:
+            resp = requests.post(
+                f"{self.api_url}/chat/completions",
+                headers=headers,
+                json=payload,
+                timeout=self.timeout,
+                stream=True,
+            )
+            resp.raise_for_status()
             for raw_line in resp.iter_lines(decode_unicode=True):
                 if not raw_line or not raw_line.startswith("data:"):
                     continue
@@ -217,8 +219,22 @@ class CloudGenerator:
                 if delta:
                     parts.append(delta)
                     yield delta
+        except requests.exceptions.RequestException as exc:
+            logger.error(f"Cloud streaming request failed: {exc}")
+            error_message = (
+                "Cloud generation is unreachable. Check the NEURAX_CLOUD_* settings "
+                "or switch to Local mode in the header above."
+            )
+        except Exception as exc:
+            logger.error(f"Error in cloud streaming generation: {exc}")
+            error_message = "I apologize, but I encountered an error while generating a response."
         finally:
-            resp.close()
+            if resp is not None:
+                resp.close()
+
+        if error_message:
+            parts.append(error_message)
+            yield error_message
 
         return GeneratedResponse(
             response_text="".join(parts),

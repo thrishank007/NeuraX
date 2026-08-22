@@ -1,5 +1,6 @@
 # tests/test_cloud_generator.py
 import pytest
+import requests
 from unittest.mock import patch, MagicMock
 from generation.cloud_generator import CloudGenerator
 from generation.lmstudio_generator import GeneratedResponse
@@ -103,3 +104,23 @@ def test_cloud_generator_stream_skips_malformed_lines():
 
     assert deltas == ["ok"]
     assert final.response_text == "ok"
+
+
+def test_cloud_generator_stream_connection_error_yields_guidance():
+    gen = CloudGenerator(_mock_config())
+    with patch("generation.cloud_generator.requests.post",
+               side_effect=requests.exceptions.ConnectionError):
+        stream = gen.generate_grounded_response_stream(
+            query="q", context=[{"content": "c", "file_path": "f"}]
+        )
+        deltas = []
+        while True:
+            try:
+                deltas.append(next(stream))
+            except StopIteration as stop:
+                final = stop.value
+                break
+
+    assert len(deltas) == 1
+    assert "unreachable" in deltas[0].lower()
+    assert "unreachable" in final.response_text.lower()
