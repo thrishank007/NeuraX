@@ -10,7 +10,19 @@ from loguru import logger
 import json
 import pickle
 from datetime import datetime
-from config import SIMILARITY_THRESHOLD, KG_CONFIG, PERFORMANCE_CONFIG
+from config import SIMILARITY_THRESHOLD, KG_CONFIG, PERFORMANCE_CONFIG, CHROMA_CONFIG, NIM_EMBEDDING_CONFIG
+
+
+def _default_collection_name() -> str:
+    """Active text collection per current embedding configuration.
+
+    Callers that relied on a hard-coded default silently split the index
+    across collections; deriving it from config keeps every entry point
+    on the collection the system actually indexes into.
+    """
+    if NIM_EMBEDDING_CONFIG["enabled"]:
+        return NIM_EMBEDDING_CONFIG["collection_name"]
+    return CHROMA_CONFIG["collection_name"]
 
 from .memory_manager import MemoryManager, ProgressiveLoader, MemoryOptimizer
 from .performance_benchmarker import PerformanceBenchmarker
@@ -19,10 +31,10 @@ from .performance_benchmarker import PerformanceBenchmarker
 class VectorStore:
     """Enhanced vector store with multimodal search capabilities and memory optimization"""
     
-    def __init__(self, persist_directory: str, collection_name: str = "neurax_collection",
+    def __init__(self, persist_directory: str, collection_name: Optional[str] = None,
                  embedding_dimension: Optional[int] = None):
         self.persist_directory = Path(persist_directory)
-        self.collection_name = collection_name
+        self.collection_name = collection_name or _default_collection_name()
         self.embedding_dimension = embedding_dimension
         self.client = None
         self.collection = None

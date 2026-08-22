@@ -147,9 +147,15 @@ class DashboardApp:
             self.feedback_system = FeedbackSystem(FEEDBACK_DIR)
             
             # Initialize vector store
+            from config import CHROMA_CONFIG, NIM_EMBEDDING_CONFIG
+            _collection = (
+                NIM_EMBEDDING_CONFIG["collection_name"]
+                if NIM_EMBEDDING_CONFIG["enabled"]
+                else CHROMA_CONFIG["collection_name"]
+            )
             self.vector_store = VectorStore(
                 persist_directory=str(VECTOR_DB_DIR),
-                collection_name="neurax_collection"
+                collection_name=_collection
             )
             
             # Initialize knowledge graph manager
