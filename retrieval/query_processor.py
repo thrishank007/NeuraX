@@ -54,10 +54,38 @@ class QueryProcessor:
         self._vocab = None
         self._vocab_doc_count = 0
 
+        # Cross-encoder reranker (lazy: only built when enabled + configured)
+        self._reranker = None
+        self._reranker_checked = False
+
         if self.llm_generator:
             logger.info("Query processor initialized (LLM query rewriting enabled)")
         else:
             logger.info("Query processor initialized")
+
+    def _get_reranker(self):
+        """Lazy NIM reranker; None when disabled, unconfigured, or broken.
+
+        Gated on the processor's own config (not the global NIM flag) so
+        unit tests passing custom configs never touch the network.
+        """
+        if self._reranker_checked:
+            return self._reranker
+        self._reranker_checked = True
+        if not self.config.get('enable_reranking', False):
+            return None
+        from config import NIM_RERANK_CONFIG
+
+        if not NIM_RERANK_CONFIG.get("enabled") or not NIM_RERANK_CONFIG.get("api_key"):
+            return None
+        try:
+            from retrieval.nim_reranker import NimReranker
+
+            self._reranker = NimReranker(NIM_RERANK_CONFIG)
+            logger.info(f"NIM reranker ready: {NIM_RERANK_CONFIG.get('model')}")
+        except Exception as exc:
+            logger.warning(f"Reranker unavailable, fusion order stands: {exc}")
+        return self._reranker
 
     # ── Vocabulary / spelling ────────────────────────────────────────────────
 
@@ -162,10 +190,15 @@ class QueryProcessor:
     # ── RRF merge ────────────────────────────────────────────────────────────
 
     @staticmethod
-    def _rrf_merge(dense_results: list, bm25_results: list, k: int, rrf_k: int = 60) -> list:
+    def _rrf_merge(dense_results: list, bm25_results: list, k: int, rrf_k: int = 60,
+                   dense_weight: float = 1.0, sparse_weight: float = 1.0) -> list:
         """Reciprocal Rank Fusion of dense and BM25 result lists.
 
-        Score(d) = sum(1 / (rrf_k + rank_i)) across all lists.
+        Score(d) = sum(weight_i / (rrf_k + rank_i)) across all lists.
+        Production callers pass dense-favored weights: equal weights let a
+        BM25 distractor outrank a chunk that dense already placed in the
+        top-k, degrading recall below dense-only on paraphrase-style
+        queries (measured on the synthetic eval corpus).
         Returns top-k by RRF score, carrying through all metadata.
         """
         scores: dict = {}
@@ -173,12 +206,12 @@ class QueryProcessor:
 
         for rank, r in enumerate(dense_results, 1):
             doc_id = r["id"]
-            scores[doc_id] = scores.get(doc_id, 0.0) + 1.0 / (rrf_k + rank)
+            scores[doc_id] = scores.get(doc_id, 0.0) + dense_weight / (rrf_k + rank)
             meta_map[doc_id] = r
 
         for rank, r in enumerate(bm25_results, 1):
             doc_id = r["id"]
-            scores[doc_id] = scores.get(doc_id, 0.0) + 1.0 / (rrf_k + rank)
+            scores[doc_id] = scores.get(doc_id, 0.0) + sparse_weight / (rrf_k + rank)
             if doc_id not in meta_map:
                 meta_map[doc_id] = r
 
@@ -225,7 +258,9 @@ class QueryProcessor:
 
             use_hybrid = self.config.get('enable_hybrid', True)
             bm25_k = self.config.get('bm25_k', 20)
-            rrf_k = self.config.get('rrf_k', 60)
+            rrf_k = self.config.get('rrf_k', 20)
+            dense_weight = self.config.get('dense_weight', 0.9)
+            sparse_weight = self.config.get('sparse_weight', 0.1)
 
             # Dense retrieval — fetch more candidates when hybrid (pre-RRF)
             dense_k = k * 3 if use_hybrid else k
@@ -233,11 +268,18 @@ class QueryProcessor:
                 query_embedding, k=dense_k, filters=filters
             )
 
+            # Optional cross-encoder reranking: rerank a wider fused
+            # candidate set down to k before the LLM sees any context.
+            reranker = self._get_reranker()
+            rerank_candidates = self.config.get('rerank_candidates', 20)
+
             if use_hybrid:
                 bm25_results = self.vector_store.bm25_search(query, k=bm25_k)
                 if bm25_results:
+                    merge_k = max(k, rerank_candidates) if reranker else k
                     search_results = self._rrf_merge(
-                        dense_results, bm25_results, k=k, rrf_k=rrf_k
+                        dense_results, bm25_results, k=merge_k, rrf_k=rrf_k,
+                        dense_weight=dense_weight, sparse_weight=sparse_weight,
                     )
                     logger.debug(
                         f"Hybrid RRF: {len(dense_results)} dense + "
@@ -245,9 +287,12 @@ class QueryProcessor:
                     )
                 else:
                     # Corpus empty — BM25 returns nothing, fall back to dense
-                    search_results = dense_results[:k]
+                    search_results = dense_results[:max(k, rerank_candidates) if reranker else k]
             else:
-                search_results = dense_results[:k]
+                search_results = dense_results[:max(k, rerank_candidates) if reranker else k]
+
+            if reranker is not None and search_results:
+                search_results = reranker.rerank_dicts(query, search_results, top_k=k)
 
             # Keep any result with a positive RRF or similarity score
             filtered_results = [

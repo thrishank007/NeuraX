@@ -78,6 +78,20 @@ NIM_EMBEDDING_CONFIG = {
     "timeout": int(os.getenv("NEURAX_NIM_EMBEDDING_TIMEOUT", "60")),
 }
 
+# Cross-encoder reranking of fused retrieval candidates (same NIM key as
+# embeddings; runs after hybrid RRF, before the LLM sees context)
+NIM_RERANK_CONFIG = {
+    "enabled": os.getenv("NEURAX_NIM_RERANK_ENABLED", "true").lower() in {"1", "true", "yes", "on"},
+    "api_url": os.getenv("NEURAX_NIM_RERANK_API_URL", "https://ai.api.nvidia.com/v1/retrieval/nvidia/reranking"),
+    "api_key": os.getenv("NEURAX_NIM_API_KEY", ""),
+    # Model id must be one the account can invoke on the reranking
+    # endpoint (nv-rerankqa-mistral-4b-v3 is NOT available on this account;
+    # the API returns the valid list on a miss).
+    "model": os.getenv("NEURAX_NIM_RERANK_MODEL", "nvidia/rerank-qa-mistral-4b"),
+    "timeout": int(os.getenv("NEURAX_NIM_RERANK_TIMEOUT", "30")),
+    "max_passages": int(os.getenv("NEURAX_NIM_RERANK_MAX_PASSAGES", "20")),
+}
+
 # CLIP image vector store (always local — 512-d, separate from text collection)
 CLIP_IMAGE_CONFIG = {
     "model": "openai/clip-vit-base-patch32",
@@ -200,7 +214,11 @@ SEARCH_CONFIG = {
     "enable_query_rewrite": False,  # Opt-in: rewrites queries via LLM before embedding
     "enable_hybrid": True,          # BM25 + dense RRF fusion (disable if corpus is empty)
     "bm25_k": 20,                   # Candidates fetched from BM25 before RRF merge
-    "rrf_k": 60,                    # RRF constant (higher = gentler rank penalty)
+    "rrf_k": 20,                    # RRF constant (higher = gentler rank penalty)
+    "dense_weight": 0.9,            # Dense-favored fusion: equal weights let BM25
+    "sparse_weight": 0.1,           #   misses outrank correct dense picks (see evals/)
+    "enable_reranking": True,       # NIM cross-encoder rerank of fused candidates
+    "rerank_candidates": 20,        # Fused candidates sent to the reranker
 }
 
 # Logging configuration
