@@ -68,6 +68,27 @@ def save_upload(filename: str, data: bytes) -> Path:
     return dest
 
 
+def _filter_cross_file_duplicates(
+    chunks: List[dict], existing_metas: List[dict], file_path: str
+) -> Tuple[List[dict], int]:
+    """Drop chunks whose text is already indexed under a different file.
+
+    Identical chunk content adds no retrieval signal (e.g. the same file
+    uploaded twice lands in different upload folders), but chunks of the
+    file being re-ingested must survive: they are replaced by the upsert
+    flow, not duplicated. Returns (kept, skipped_count).
+    """
+    foreign_hashes = {
+        m.get("content_hash")
+        for m in existing_metas or []
+        if m.get("content_hash") and m.get("file_path") != file_path
+    }
+    if not foreign_hashes:
+        return chunks, 0
+    kept = [c for c in chunks if c.get("content_hash") not in foreign_hashes]
+    return kept, len(chunks) - len(kept)
+
+
 def _embed_and_store(registry: ComponentRegistry, result: dict) -> Optional[str]:
     """Chunk text documents, embed each chunk, upsert with deterministic IDs.
 
@@ -142,16 +163,31 @@ def _embed_and_store(registry: ComponentRegistry, result: dict) -> Optional[str]
         logger.info(f"Indexed audio file to image/audio store: {file_path}")
         return chunk_id
 
-    # ── Text documents: chunk → embed → upsert ──────────────────────────────
+    # ── Text documents: chunk → dedupe → embed → upsert ────────────────────
     chunks = chunk_document(result)
     if not chunks:
         raise ValueError("No embeddable content extracted")
 
+    file_path = str(result.get("file_path", ""))
+    doc_metadata = result.get("metadata") or {}
+
+    try:
+        existing_metas = vector_store.collection.get(include=["metadatas"]).get("metadatas") or []
+    except Exception as exc:
+        logger.warning(f"Could not read existing chunks for dedup, indexing all: {exc}")
+        existing_metas = []
+    chunks, skipped = _filter_cross_file_duplicates(chunks, existing_metas, file_path)
+    if skipped:
+        logger.info(
+            f"Skipped {skipped} chunk(s) for {file_path}: identical content already indexed under another file"
+        )
+    if not chunks:
+        logger.warning(f"All chunks of {file_path} duplicate existing content; nothing indexed")
+        return None
+
     texts = [c["content"] for c in chunks]
     embeddings = embedding_manager.embed_text(texts)  # batch; passage mode via NIM or MiniLM
 
-    file_path = str(result.get("file_path", ""))
-    doc_metadata = result.get("metadata") or {}
     ids: list[str] = []
     chunk_dicts: list[dict] = []
 
