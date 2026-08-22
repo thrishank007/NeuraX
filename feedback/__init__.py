@@ -1,5 +1,5 @@
 """
-Feedback system for SecureInsight multimodal RAG system.
+Feedback system for NeuraX multimodal RAG system.
 
 This module provides feedback collection, storage, and analysis capabilities
 for continuous system improvement and performance tracking.

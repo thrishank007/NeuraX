@@ -1,11 +1,13 @@
 """
-Configuration settings for SecureInsight RAG system
+Configuration settings for NeuraX RAG system
 """
 import os
 from pathlib import Path
+from dotenv import load_dotenv
 
 # Project paths
 PROJECT_ROOT = Path(__file__).parent
+load_dotenv(PROJECT_ROOT / ".env")
 DATA_DIR = PROJECT_ROOT / "data"
 MODELS_DIR = PROJECT_ROOT / "models"
 VECTOR_DB_DIR = PROJECT_ROOT / "vector_db"
@@ -55,6 +57,64 @@ LM_STUDIO_CONFIG = {
     "fallback_timeout": 30  # Shorter timeout for fallback attempts
 }
 
+# Cloud LLM Configuration (OpenAI-compatible endpoint)
+CLOUD_LLM_CONFIG = {
+    "api_url": os.getenv("NEURAX_CLOUD_API_URL", ""),
+    "api_key": os.getenv("NEURAX_CLOUD_API_KEY", ""),
+    "model": os.getenv("NEURAX_CLOUD_MODEL", ""),
+    "max_tokens": int(os.getenv("NEURAX_CLOUD_MAX_TOKENS", "1024")),
+    "temperature": float(os.getenv("NEURAX_CLOUD_TEMPERATURE", "0.7")),
+    "timeout": int(os.getenv("NEURAX_CLOUD_TIMEOUT", "60")),
+}
+
+# Deployment strategy — one switch for local-vs-cloud service defaults.
+#   offline_first (default): fully local posture. NIM embeddings and
+#     reranking stay off and chat defaults to LM Studio, unless each
+#     service is explicitly enabled via its own NEURAX_* variable.
+#   online_first: prefer cloud services when credentials exist — NIM
+#     embeddings + reranking default on, chat defaults to cloud mode.
+# NEURAX_CD is accepted as an alias (earlier name for the same switch);
+# hyphenated values normalize to underscores. Explicit NEURAX_* service
+# flags always win over the strategy default.
+STRATEGY = (os.getenv("NEURAX_STRATEGY") or os.getenv("NEURAX_CD") or "offline_first")
+STRATEGY = STRATEGY.strip().lower().replace("-", "_")
+ONLINE_FIRST = STRATEGY in {"online_first", "cloud_first"}
+CHAT_DEFAULT_MODE = "cloud" if ONLINE_FIRST else "local"
+
+# NVIDIA NIM text embeddings (opt-in; leave disabled for the local MiniLM path)
+NIM_EMBEDDING_CONFIG = {
+    "enabled": os.getenv("NEURAX_NIM_EMBEDDINGS_ENABLED",
+                         "true" if ONLINE_FIRST else "false").lower() in {"1", "true", "yes", "on"},
+    "api_url": os.getenv("NEURAX_NIM_EMBEDDING_API_URL", "https://integrate.api.nvidia.com/v1/embeddings"),
+    "api_key": os.getenv("NEURAX_NIM_API_KEY", ""),
+    "model": os.getenv("NEURAX_NIM_EMBEDDING_MODEL", "nvidia/nemotron-3-embed-1b"),
+    "dimension": 2048,
+    "collection_name": os.getenv("NEURAX_NIM_COLLECTION_NAME", "neurax_nim_nemotron_3_embed_1b_v1"),
+    "timeout": int(os.getenv("NEURAX_NIM_EMBEDDING_TIMEOUT", "60")),
+}
+
+# Cross-encoder reranking of fused retrieval candidates (same NIM key as
+# embeddings; runs after hybrid RRF, before the LLM sees context)
+NIM_RERANK_CONFIG = {
+    "enabled": os.getenv("NEURAX_NIM_RERANK_ENABLED",
+                         "true" if ONLINE_FIRST else "false").lower() in {"1", "true", "yes", "on"},
+    "api_url": os.getenv("NEURAX_NIM_RERANK_API_URL", "https://ai.api.nvidia.com/v1/retrieval/nvidia/reranking"),
+    "api_key": os.getenv("NEURAX_NIM_API_KEY", ""),
+    # Model id must be one the account can invoke on the reranking
+    # endpoint (nv-rerankqa-mistral-4b-v3 is NOT available on this account;
+    # the API returns the valid list on a miss).
+    "model": os.getenv("NEURAX_NIM_RERANK_MODEL", "nvidia/rerank-qa-mistral-4b"),
+    "timeout": int(os.getenv("NEURAX_NIM_RERANK_TIMEOUT", "30")),
+    "max_passages": int(os.getenv("NEURAX_NIM_RERANK_MAX_PASSAGES", "20")),
+}
+
+# CLIP image vector store (always local — 512-d, separate from text collection)
+CLIP_IMAGE_CONFIG = {
+    "model": "openai/clip-vit-base-patch32",
+    "dimension": 512,
+    "collection_name": os.getenv("NEURAX_CLIP_COLLECTION_NAME", "neurax_clip_images_v1"),
+}
+
 # Legacy LLM_CONFIG for backward compatibility (now redirects to LM Studio)
 LLM_CONFIG = {
     # Deprecated - Use LM_STUDIO_CONFIG instead
@@ -90,7 +150,7 @@ WHISPER_CONFIG = {
 # Vector database settings
 CHROMA_CONFIG = {
     "persist_directory": str(VECTOR_DB_DIR),
-    "collection_name": "secureinsight_with_docs",
+    "collection_name": "neurax_with_docs",
     "embedding_function": None,  # Will be set by EmbeddingManager
     "distance_function": "cosine",
     "hnsw_space": "cosine",
@@ -98,16 +158,15 @@ CHROMA_CONFIG = {
     "allow_reset": True
 }
 
-# UI settings
-GRADIO_CONFIG = {
-    "server_name": "127.0.0.1",
-    "server_port": 7860,
-    "share": False
+# UI settings — product UI is Next.js + FastAPI (see frontend/, backend/)
+FRONTEND_CONFIG = {
+    "url": "http://127.0.0.1:3000",
+    "api_url": "http://127.0.0.1:8000",
 }
 
 STREAMLIT_CONFIG = {
     "server_port": 8501,
-    "server_address": "127.0.0.1"
+    "server_address": "127.0.0.1",
 }
 
 # Security and KG settings
@@ -126,12 +185,58 @@ KG_CONFIG = {
     "edge_weight_threshold": 0.3
 }
 
+# Graphify document knowledge graph (optional external CLI — not the security NetworkX graph)
+# Install separately: uv tool install "graphifyy[openai]"  or  pipx install "graphifyy[openai]"
+GRAPHIFY_CONFIG = {
+    "enabled": True,
+    "executable": os.getenv("GRAPHIFY_EXECUTABLE", "graphify"),
+    "workspace_dir": DATA_DIR / "graphify",
+    "default_workspace_id": "default",
+    "backend": "openai",
+    "base_url": os.getenv("GRAPHIFY_OPENAI_BASE_URL", LM_STUDIO_CONFIG["base_url"]),
+    "api_key": os.getenv("GRAPHIFY_OPENAI_API_KEY", "lm-studio"),
+    "model": os.getenv("GRAPHIFY_MODEL", LM_STUDIO_CONFIG["qwen_model"]),
+    "mode": "deep",
+    "auto_update_after_ingestion": False,
+    "max_concurrency": 1,
+    "api_timeout_seconds": 900,
+    "process_timeout_seconds": 1800,
+    "token_budget": 2000,  # ponytail: Qwen 4B output cap ~908 tok; small chunks prevent hollow responses
+    "max_query_output_chars": 12000,
+    "max_query_length": 2000,
+    "max_visualization_nodes": 1000,
+    "max_graph_json_bytes": 50 * 1024 * 1024,
+    "max_stdout_capture_bytes": 2 * 1024 * 1024,
+    "max_stderr_capture_bytes": 1 * 1024 * 1024,
+    "max_rag_context_chars": 4000,
+    "max_rag_context_nodes": 25,
+    "max_rag_context_edges": 40,
+    "allow_non_local_endpoint": False,
+    "install_hint": (
+        'Graphify is not installed. Install with:\n'
+        '  uv tool install "graphifyy[openai]"\n'
+        '  # or\n'
+        '  pipx install "graphifyy[openai]"\n'
+        "Requires Python 3.10+. NeuraX itself can still run without Graphify."
+    ),
+}
+
 # Search and retrieval settings
 SIMILARITY_THRESHOLD = 0.5
 SEARCH_CONFIG = {
     "default_k": 5,
     "max_results": 50,
-    "similarity_threshold": SIMILARITY_THRESHOLD
+    "similarity_threshold": SIMILARITY_THRESHOLD,
+    "enable_query_rewrite": False,  # Opt-in: rewrites queries via LLM before embedding
+    "enable_hybrid": True,          # BM25 + dense RRF fusion (disable if corpus is empty)
+    "bm25_k": 20,                   # Candidates fetched from BM25 before RRF merge
+    "rrf_k": 20,                    # RRF constant (higher = gentler rank penalty)
+    "dense_weight": 0.9,            # Dense-favored fusion: equal weights let BM25
+    "sparse_weight": 0.1,           #   misses outrank correct dense picks (see evals/)
+    # Opt-in is two-key: the NIM_RERANK master switch AND a key present.
+    # SEARCH_CONFIG alone must never trigger cloud calls (local-first default).
+    "enable_reranking": NIM_RERANK_CONFIG["enabled"] and bool(NIM_RERANK_CONFIG.get("api_key")),
+    "rerank_candidates": 20,        # Fused candidates sent to the reranker
 }
 
 # Logging configuration

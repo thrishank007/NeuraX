@@ -1,1 +1,1 @@
-# Indexing module for SecureInsight
+# Indexing module for NeuraX

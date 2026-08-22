@@ -1,1 +1,1 @@
-# Ingestion module for SecureInsight
+# Ingestion module for NeuraX

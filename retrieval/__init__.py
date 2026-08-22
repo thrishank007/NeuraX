@@ -1,1 +1,1 @@
-# Retrieval module for SecureInsight
+# Retrieval module for NeuraX

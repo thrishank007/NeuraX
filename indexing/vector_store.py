@@ -10,7 +10,19 @@ from loguru import logger
 import json
 import pickle
 from datetime import datetime
-from config import SIMILARITY_THRESHOLD, KG_CONFIG, PERFORMANCE_CONFIG
+from config import SIMILARITY_THRESHOLD, KG_CONFIG, PERFORMANCE_CONFIG, CHROMA_CONFIG, NIM_EMBEDDING_CONFIG
+
+
+def _default_collection_name() -> str:
+    """Active text collection per current embedding configuration.
+
+    Callers that relied on a hard-coded default silently split the index
+    across collections; deriving it from config keeps every entry point
+    on the collection the system actually indexes into.
+    """
+    if NIM_EMBEDDING_CONFIG["enabled"]:
+        return NIM_EMBEDDING_CONFIG["collection_name"]
+    return CHROMA_CONFIG["collection_name"]
 
 from .memory_manager import MemoryManager, ProgressiveLoader, MemoryOptimizer
 from .performance_benchmarker import PerformanceBenchmarker
@@ -19,9 +31,11 @@ from .performance_benchmarker import PerformanceBenchmarker
 class VectorStore:
     """Enhanced vector store with multimodal search capabilities and memory optimization"""
     
-    def __init__(self, persist_directory: str, collection_name: str = "secureinsight_collection"):
+    def __init__(self, persist_directory: str, collection_name: Optional[str] = None,
+                 embedding_dimension: Optional[int] = None):
         self.persist_directory = Path(persist_directory)
-        self.collection_name = collection_name
+        self.collection_name = collection_name or _default_collection_name()
+        self.embedding_dimension = embedding_dimension
         self.client = None
         self.collection = None
         
@@ -219,36 +233,25 @@ class VectorStore:
             
             logger.debug(f"Added document chunk {i//chunk_size + 1}: {end_idx}/{len(documents)} documents")
     
-    def _standardize_query_embedding(self, query_embedding: np.ndarray, target_dim: int = 384) -> np.ndarray:
+    def _standardize_query_embedding(self, query_embedding: np.ndarray, target_dim: Optional[int] = None) -> np.ndarray:
         """
         Standardize query embedding dimension to match collection embeddings
         
         Args:
             query_embedding: Input query embedding
-            target_dim: Target dimension (default 384)
+            target_dim: Expected dimension (uses the collection configuration by default)
             
         Returns:
             Standardized query embedding
         """
+        expected_dim = target_dim or self.embedding_dimension
         current_dim = query_embedding.shape[0] if query_embedding.ndim == 1 else query_embedding.shape[-1]
-        
-        if current_dim == target_dim:
-            return query_embedding
-        elif current_dim > target_dim:
-            # Truncate to target dimension
-            logger.warning(f"Truncating query embedding from {current_dim} to {target_dim} dimensions")
-            return query_embedding[:target_dim] if query_embedding.ndim == 1 else query_embedding[..., :target_dim]
-        else:
-            # Pad with zeros to reach target dimension
-            logger.warning(f"Padding query embedding from {current_dim} to {target_dim} dimensions")
-            if query_embedding.ndim == 1:
-                padding = np.zeros(target_dim - current_dim)
-                return np.concatenate([query_embedding, padding])
-            else:
-                padding_shape = list(query_embedding.shape)
-                padding_shape[-1] = target_dim - current_dim
-                padding = np.zeros(padding_shape)
-                return np.concatenate([query_embedding, padding], axis=-1)
+        if expected_dim is not None and current_dim != expected_dim:
+            raise ValueError(
+                f"Query embedding has {current_dim} dimensions, but collection "
+                f"'{self.collection_name}' expects {expected_dim} dimensions. Re-index with one embedding model."
+            )
+        return query_embedding
 
     def similarity_search(self, query_embedding: np.ndarray, k: int = 5, 
                          filters: Optional[Dict] = None, 
@@ -363,28 +366,28 @@ class VectorStore:
                 if result['id'] not in seen_ids:
                     unique_results.append(result)
                     seen_ids.add(result['id'])
-            
+
             # Sort by similarity score and return top-k
             unique_results.sort(key=lambda x: x['similarity_score'], reverse=True)
             return unique_results[:k]
-            
+
         except Exception as e:
             logger.error(f"Failed to perform hybrid search: {e}")
             return []
-    
+
     def cross_modal_search(self, query_embedding: np.ndarray, target_modality: str = None,
                           k: int = 5, filters: Optional[Dict] = None,
                           similarity_threshold: Optional[float] = None) -> List[Dict]:
         """
         Perform cross-modal search (e.g., text query finding images)
-        
+
         Args:
             query_embedding: Query embedding vector
             target_modality: Target modality to search ('text', 'image', or None for all)
             k: Number of results to return
             filters: Optional metadata filters
             similarity_threshold: Minimum similarity threshold
-            
+
         Returns:
             List of search results
         """
@@ -393,15 +396,66 @@ class VectorStore:
             search_filters = filters.copy() if filters else {}
             if target_modality:
                 search_filters['embedding_type'] = target_modality
-            
+
             return self.similarity_search(
                 query_embedding, k, search_filters, similarity_threshold
             )
-            
+
         except Exception as e:
             logger.error(f"Failed to perform cross-modal search: {e}")
             return []
     
+    def bm25_search(self, query: str, k: int = 20) -> List[Dict]:
+        """BM25 keyword search over all documents in the collection.
+
+        Fetches all docs from Chroma, builds an in-memory BM25Okapi index, and
+        returns ranked results with the same dict shape as similarity_search().
+
+        ponytail: rebuilds corpus every call — fine under ~100k chunks.
+        Upgrade: cache BM25 index, invalidate on collection.count() change.
+        """
+        try:
+            from rank_bm25 import BM25Okapi
+            import re
+
+            data = self.collection.get(include=["documents", "metadatas"])
+            ids = data.get("ids") or []
+            docs = data.get("documents") or []
+            metas = data.get("metadatas") or []
+
+            if not ids:
+                return []
+
+            def _tokenize(text: str) -> list:
+                return re.findall(r"\b\w+\b", (text or "").lower())
+
+            tokenized_corpus = [_tokenize(d) for d in docs]
+            bm25 = BM25Okapi(tokenized_corpus)
+            query_tokens = _tokenize(query)
+            scores = bm25.get_scores(query_tokens)
+
+            indexed = sorted(
+                ((score, i) for i, score in enumerate(scores) if score > 0),
+                reverse=True,
+            )[:k]
+
+            results = []
+            for score, i in indexed:
+                results.append({
+                    "id": ids[i],
+                    "bm25_score": float(score),
+                    "similarity_score": 0.0,
+                    "distance": 0.0,
+                    "metadata": metas[i] if i < len(metas) else {},
+                    "document": docs[i] if i < len(docs) else "",
+                    "query_type": "bm25",
+                })
+            return results
+
+        except Exception as e:
+            logger.warning(f"BM25 search failed (falling back to dense-only): {e}")
+            return []
+
     def get_similar_documents(self, doc_id: str, k: int = 5) -> List[Dict]:
         """
         Find documents similar to a given document

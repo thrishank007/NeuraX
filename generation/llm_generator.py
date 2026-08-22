@@ -516,9 +516,6 @@ class LLMGenerator:
         max_length = max_length or self.max_length
         
         try:
-            if not context:
-                return self._generate_no_context_response(query, start_time)
-            
             # Prepare context for generation
             context_text = self._prepare_context(context)
             
@@ -533,16 +530,20 @@ class LLMGenerator:
             response_text = self._generate_with_model(prompt, max_length)
             
             # Validate grounding
-            grounding_score = self._validate_response_grounding(response_text, context)
-            
-            # Extract citation needs
-            citations_needed = self._identify_citation_needs(response_text, context)
+            if context:
+                grounding_score = self._validate_response_grounding(response_text, context)
+                citations_needed = self._identify_citation_needs(response_text, context)
+                confidence_score = min(grounding_score, 0.9)
+            else:
+                grounding_score = 0.0
+                citations_needed = []
+                confidence_score = 0.0
             
             processing_time = time.time() - start_time
             
             return GeneratedResponse(
                 response_text=response_text,
-                confidence_score=min(grounding_score, 0.9),  # Cap confidence
+                confidence_score=confidence_score,
                 processing_time=processing_time,
                 context_used=context,
                 grounding_score=grounding_score,
@@ -579,12 +580,20 @@ class LLMGenerator:
     
     def _create_grounded_prompt(self, query: str, context_text: str) -> str:
         """Create a prompt using Llama 3.2's instruction format for grounded responses"""
-        # Use Llama 3.2's chat template format
-        system_message = """You are a helpful AI assistant that provides accurate answers based only on the provided documents. 
+        if not context_text:
+            system_message = (
+                "You are NeuraX, a helpful and polite AI assistant. "
+                "Answer the user's query clearly and conversationally. "
+                "If the user asks a specific question about documents or facts not provided, clearly state that no relevant documents were found in the index."
+            )
+            user_message = query
+        else:
+            # Use Llama 3.2's chat template format
+            system_message = """You are a helpful AI assistant that provides accurate answers based only on the provided documents. 
 If the documents don't contain enough information to answer the question, clearly state that you don't have enough information.
 Always ground your responses in the provided context and cite specific information when possible."""
-        
-        user_message = f"""Documents:
+            
+            user_message = f"""Documents:
 {context_text}
 
 Question: {query}

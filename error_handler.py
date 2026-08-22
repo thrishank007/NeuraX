@@ -1,5 +1,5 @@
 """
-Comprehensive error handling system for SecureInsight RAG
+Comprehensive error handling system for NeuraX RAG
 """
 import torch
 import psutil
@@ -18,9 +18,11 @@ from datetime import datetime
 import os
 import shutil
 
+import urllib.request
+
 from config import (
-    ERROR_CONFIG, PERFORMANCE_CONFIG, MODEL_DOWNLOAD_CONFIG, 
-    PROCESSING_CONFIG, SECURITY_CONFIG, LOGS_DIR
+    ERROR_CONFIG, PERFORMANCE_CONFIG, MODEL_DOWNLOAD_CONFIG,
+    PROCESSING_CONFIG, SECURITY_CONFIG, LOGS_DIR, LM_STUDIO_CONFIG
 )
 
 
@@ -747,13 +749,27 @@ class ErrorHandler:
         
         try:
             # Test 1: Check local model availability
-            models_dir = Path(MODEL_DOWNLOAD_CONFIG['cache_dir'])
-            if models_dir.exists() and list(models_dir.glob('**/*')):
-                test_results['tests_passed'].append('Local models available')
-            else:
-                test_results['tests_failed'].append('No local models found')
+            # ponytail: checks LM Studio REST API instead of local models/ dir,
+            # since the project migrated to LM Studio for model hosting.
+            # Ceiling: only checks localhost:1234; adjust LM_STUDIO_CONFIG if port changes.
+            try:
+                _base = LM_STUDIO_CONFIG.get('base_url', 'http://localhost:1234/v1')
+                # ponytail: replace localhost with 127.0.0.1 — on Windows, localhost can
+                # resolve to ::1 (IPv6) which fails even when 127.0.0.1 is listening.
+                _url = _base.rstrip('/') + '/models'
+                _url = _url.replace('localhost', '127.0.0.1')
+                with urllib.request.urlopen(_url, timeout=5) as _r:
+                    _models = json.loads(_r.read()).get('data', [])
+                if _models:
+                    test_results['tests_passed'].append(f'Local models available via LM Studio ({len(_models)} loaded)')
+                else:
+                    test_results['tests_failed'].append('LM Studio running but no models loaded')
+                    test_results['offline_capable'] = False
+                    test_results['recommendations'].append('Load a model in LM Studio before starting NeuraX')
+            except Exception:
+                test_results['tests_failed'].append('No local models found (LM Studio not reachable on localhost:1234)')
                 test_results['offline_capable'] = False
-                test_results['recommendations'].append('Download models using download_models.py')
+                test_results['recommendations'].append('Start LM Studio, load a model, and enable the Local Server')
             
             # Test 2: Check vector database
             vector_db_dir = Path('vector_db')

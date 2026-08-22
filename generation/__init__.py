@@ -1,1 +1,1 @@
-# Generation module for SecureInsight
+# Generation module for NeuraX

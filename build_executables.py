@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Automated build script for SecureInsight portable executables
+Automated build script for NeuraX portable executables
 """
 import os
 import sys
@@ -21,8 +21,8 @@ from create_pyinstaller_spec import create_spec_file, validate_spec_file
 from error_handler import ErrorHandler, ErrorCategory, ErrorSeverity
 
 
-class SecureInsightBuilder:
-    """Automated builder for SecureInsight portable executables"""
+class NeuraXBuilder:
+    """Automated builder for NeuraX portable executables"""
     
     def __init__(self):
         self.error_handler = ErrorHandler()
@@ -36,7 +36,7 @@ class SecureInsightBuilder:
         self.package_dir = PATHS_CONFIG['package_dir']
         self.spec_dir = PATHS_CONFIG['spec_dir']
         
-        logger.info("SecureInsight Builder initialized")
+        logger.info("NeuraX Builder initialized")
     
     def log_step(self, message: str, success: bool = True):
         """Log build step with timestamp"""
@@ -248,7 +248,7 @@ class SecureInsightBuilder:
         self.log_step("Building executable with PyInstaller...")
         
         try:
-            spec_file = self.spec_dir / 'secureinsight.spec'
+            spec_file = self.spec_dir / 'neurax.spec'
             
             if not spec_file.exists():
                 self.log_step("Spec file not found", False)
@@ -276,8 +276,8 @@ class SecureInsightBuilder:
                 return False
             
             # Check if executable was created
-            exe_name = 'secureinsight.exe' if platform.system() == 'Windows' else 'secureinsight'
-            exe_path = self.dist_dir / 'secureinsight' / exe_name
+            exe_name = 'neurax.exe' if platform.system() == 'Windows' else 'neurax'
+            exe_path = self.dist_dir / 'neurax' / exe_name
             
             if not exe_path.exists():
                 self.log_step("Executable not found after build", False)
@@ -302,12 +302,12 @@ class SecureInsightBuilder:
             self.package_dir.mkdir(parents=True, exist_ok=True)
             
             # Copy executable and dependencies
-            exe_dir = self.dist_dir / 'secureinsight'
+            exe_dir = self.dist_dir / 'neurax'
             if not exe_dir.exists():
                 self.log_step("Executable directory not found", False)
                 return False
             
-            package_name = f"SecureInsight-{platform.system()}-{platform.machine()}"
+            package_name = f"NeuraX-{platform.system()}-{platform.machine()}"
             target_dir = self.package_dir / package_name
             
             if target_dir.exists():
@@ -367,16 +367,16 @@ class SecureInsightBuilder:
             usb_dir.mkdir(parents=True, exist_ok=True)
             
             # Copy executable
-            exe_dir = self.dist_dir / 'secureinsight'
+            exe_dir = self.dist_dir / 'neurax'
             if exe_dir.exists():
-                shutil.copytree(exe_dir, usb_dir / 'SecureInsight', dirs_exist_ok=True)
+                shutil.copytree(exe_dir, usb_dir / 'NeuraX', dirs_exist_ok=True)
             
             # Create autorun file for Windows
             if platform.system() == 'Windows':
                 autorun_content = """[autorun]
-open=SecureInsight\\secureinsight.exe
-icon=SecureInsight\\icon.ico
-label=SecureInsight RAG System
+open=NeuraX\\neurax.exe
+icon=NeuraX\\icon.ico
+label=NeuraX RAG System
 """
                 with open(usb_dir / 'autorun.inf', 'w') as f:
                     f.write(autorun_content)
@@ -384,27 +384,27 @@ label=SecureInsight RAG System
             # Create launcher scripts
             if platform.system() == 'Windows':
                 launcher_content = """@echo off
-cd /d "%~dp0SecureInsight"
-secureinsight.exe
+cd /d "%~dp0NeuraX"
+neurax.exe
 pause
 """
-                with open(usb_dir / 'Launch_SecureInsight.bat', 'w') as f:
+                with open(usb_dir / 'Launch_NeuraX.bat', 'w') as f:
                     f.write(launcher_content)
             else:
                 launcher_content = """#!/bin/bash
-cd "$(dirname "$0")/SecureInsight"
-./secureinsight
+cd "$(dirname "$0")/NeuraX"
+./neurax
 """
-                launcher_path = usb_dir / 'Launch_SecureInsight.sh'
+                launcher_path = usb_dir / 'Launch_NeuraX.sh'
                 with open(launcher_path, 'w') as f:
                     f.write(launcher_content)
                 launcher_path.chmod(0o755)
             
             # Create README for USB
-            readme_content = f"""# SecureInsight USB Deployment
+            readme_content = f"""# NeuraX USB Deployment
 
 ## Quick Start
-1. Run Launch_SecureInsight.{('bat' if platform.system() == 'Windows' else 'sh')}
+1. Run Launch_NeuraX.{('bat' if platform.system() == 'Windows' else 'sh')}
 2. Wait for the application to load
 3. Upload documents and start searching
 
@@ -437,8 +437,8 @@ Built on: {time.strftime('%Y-%m-%d %H:%M:%S')}
         
         try:
             # Test executable exists and is executable
-            exe_name = 'secureinsight.exe' if platform.system() == 'Windows' else 'secureinsight'
-            exe_path = self.dist_dir / 'secureinsight' / exe_name
+            exe_name = 'neurax.exe' if platform.system() == 'Windows' else 'neurax'
+            exe_path = self.dist_dir / 'neurax' / exe_name
             
             if not exe_path.exists():
                 self.log_step("Executable not found", False)
@@ -542,7 +542,7 @@ Built on: {time.strftime('%Y-%m-%d %H:%M:%S')}
     
     def build(self) -> bool:
         """Execute complete build process"""
-        self.log_step("Starting SecureInsight build process...")
+        self.log_step("Starting NeuraX build process...")
         
         try:
             # Build steps
@@ -606,7 +606,7 @@ def main():
     """Main entry point for build script"""
     import argparse
     
-    parser = argparse.ArgumentParser(description='Build SecureInsight portable executables')
+    parser = argparse.ArgumentParser(description='Build NeuraX portable executables')
     parser.add_argument('--clean', action='store_true', help='Clean build directories before building')
     parser.add_argument('--no-models', action='store_true', help='Skip model download step')
     parser.add_argument('--no-tests', action='store_true', help='Skip post-build tests')
@@ -621,7 +621,7 @@ def main():
         logger.add("build.log", rotation="10 MB", level="INFO")
     
     try:
-        builder = SecureInsightBuilder()
+        builder = NeuraXBuilder()
         
         # Override steps based on arguments
         if args.no_models:

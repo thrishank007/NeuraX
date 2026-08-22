@@ -41,14 +41,28 @@ NeuraX is a production-ready offline multimodal Retrieval-Augmented Generation (
 
 ## 🏗️ Architecture
 
+```text
+Next.js frontend (frontend/, :3000)
+    ↓ HTTP / SSE
+FastAPI service layer (backend/, :8000)
+    ↓
+Existing Python domain modules (ingestion, indexing, retrieval, generation)
+    ↓
+ChromaDB · embeddings · Whisper · CLIP · LM Studio
+```
+
+**Product UI is Next.js only.** Streamlit (`:8501`) is optional analytics, not the main interface.
+
 ### Core Components
 - **LM Studio Integration**: Local LLM server for multimodal and reasoning tasks
 - **ChromaDB**: Persistent vector database for semantic search
 - **CLIP Embeddings**: Visual-text cross-modal understanding
 - **Whisper STT**: Speech-to-text for audio processing
-- **NetworkX**: Knowledge graph with security monitoring
-- **Gradio UI**: Modern web interface for end users
-- **Streamlit Dashboard**: Analytics and system monitoring
+- **NetworkX**: Security-focused knowledge graph (anomaly / tamper monitoring)
+- **Graphify (optional)**: Document knowledge graph for corpus intelligence (CLI integration)
+- **FastAPI**: Thin HTTP API over domain modules
+- **Next.js UI**: Primary workspace (Chat, Documents, Sources, Graph, Settings)
+- **Streamlit Dashboard**: Optional analytics only
 
 ## 🛠️ System Requirements
 
@@ -68,6 +82,7 @@ NeuraX is a production-ready offline multimodal Retrieval-Augmented Generation (
 - **LM Studio**: For local LLM hosting (Gemma 3n + Qwen3 4B)
 - **Tesseract OCR**: For document text extraction (auto-bundled)
 - **FFmpeg**: For audio processing (platform-specific installation)
+- **Graphify (optional)**: Document knowledge graph CLI — see [Knowledge Graph (Graphify)](#-knowledge-graph-graphify-document-intelligence)
 
 ## 🚀 Quick Start
 
@@ -83,8 +98,142 @@ python install_dependencies.py
 # Setup LM Studio integration
 python migrate_to_lmstudio.py
 
-# Launch the system
-python main_launcher.py
+# Launch product UI (Next.js + FastAPI)
+pwsh scripts/dev.ps1
+```
+
+### Next.js + FastAPI (product UI)
+
+```bash
+# Backend (repo root, venv active)
+uvicorn backend.main:app --reload --host 127.0.0.1 --port 8000
+
+# Frontend
+cd frontend
+cp .env.local.example .env.local   # Windows: copy .env.local.example .env.local
+npm install
+npm run dev
+```
+
+Or start both (Windows):
+
+```powershell
+pwsh scripts/dev.ps1
+```
+
+| Surface | URL |
+|---|---|
+| Next.js workspace | http://127.0.0.1:3000 |
+| FastAPI | http://127.0.0.1:8000 |
+| API docs | http://127.0.0.1:8000/docs |
+| Streamlit (optional) | http://127.0.0.1:8501 |
+
+Environment templates: [`.env.example`](.env.example), [`frontend/.env.local.example`](frontend/.env.local.example).
+
+## 🕸️ Knowledge Graph (Graphify document intelligence)
+
+NeuraX has **two different graph layers**. They are not interchangeable.
+
+| Layer | Module | Purpose |
+|---|---|---|
+| **Security graph** | `kg_security/knowledge_graph_manager.py` (NetworkX) | Anomaly detection, tamper monitoring, security analytics |
+| **Document graph** | `kg_security/graphify_service.py` + Graphify CLI | Build / query a knowledge graph over uploaded documents |
+
+The product **Knowledge Graph** page (`/graph`) is the Graphify document-intelligence UI. The security graph remains available for analytics/export and is **not** removed or renamed.
+
+### Why Graphify is optional
+
+- NeuraX supports older Python runtimes in some deployments.
+- Graphify (`graphifyy`) requires **Python 3.10+**.
+- Therefore Graphify is **never** a mandatory import-time dependency.
+- NeuraX talks to Graphify only through its **installed CLI** (`subprocess`, never `shell=True`).
+- If Graphify is missing, NeuraX still launches; the UI shows install guidance.
+
+### Install Graphify (separate from NeuraX)
+
+```bash
+# Recommended: isolated tool install
+uv tool install "graphifyy[openai]"
+# or
+pipx install "graphifyy[openai]"
+```
+
+Verify:
+
+```bash
+graphify --version
+graphify extract --help
+```
+
+Optional: point NeuraX at a custom binary:
+
+```bash
+# Windows PowerShell
+$env:GRAPHIFY_EXECUTABLE = "C:\path\to\graphify.exe"
+```
+
+### LM Studio setup for Graphify
+
+Graphify semantic extraction uses the same local OpenAI-compatible endpoint as NeuraX:
+
+1. Start LM Studio and serve a chat model (e.g. Qwen) on `http://localhost:1234/v1`.
+2. NeuraX sets `OPENAI_BASE_URL`, `OPENAI_API_KEY`, and `OPENAI_MODEL` for Graphify child processes.
+3. By default only **loopback** endpoints are allowed (`localhost`, `127.0.0.1`, `::1`).
+
+### Configuration (`GRAPHIFY_CONFIG` in `config.py`)
+
+| Key | Meaning |
+|---|---|
+| `enabled` | Master switch for Graphify integration |
+| `executable` / `GRAPHIFY_EXECUTABLE` | CLI name or absolute path |
+| `workspace_dir` | `data/graphify/` managed workspaces |
+| `base_url` | LM Studio OpenAI-compatible base URL |
+| `api_key` / `GRAPHIFY_OPENAI_API_KEY` | Dummy local key (default `lm-studio`) |
+| `model` / `GRAPHIFY_MODEL` | Model id for extraction |
+| `mode` | e.g. `deep` when supported by CLI |
+| `auto_update_after_ingestion` | If true, run incremental update after upload batch |
+| `max_concurrency` | Passed to extract when supported |
+| `api_timeout_seconds` / `process_timeout_seconds` | Timeouts |
+| `allow_non_local_endpoint` | Must be true to allow non-loopback model URLs |
+| `max_rag_context_*` | Caps for optional graph-enhanced RAG |
+
+### Workflow
+
+1. Upload documents in the **Documents** page (vector indexing runs as usual).
+2. Successfully processed files are copied into a **managed Graphify corpus** under `data/graphify/default/corpus/` (sanitized names, SHA-256 manifest, no path traversal).
+3. Open **Knowledge Graph** and choose:
+   - **Build Knowledge Graph** — extract from corpus
+   - **Update Knowledge Graph** — incremental update when available
+   - **Rebuild From Scratch** — clear artifacts and re-extract
+4. View stats, filter by type/community/source/confidence, run **query / explain / path**.
+5. Download artifacts: `graph.html`, `graph.json`, `GRAPH_REPORT.md`.
+6. In **Chat**, optionally enable **Use Knowledge Graph Context** to append compact graph relationships to vector RAG (never replaces ChromaDB retrieval). Inferred edges are labeled `EXTRACTED` / `INFERRED` / `AMBIGUOUS`.
+
+### Offline / privacy
+
+- Graph builds call **local** LM Studio only (default).
+- Corpus and artifacts stay under `data/graphify/` (gitignored).
+- No Graphify package code is imported into core NeuraX modules.
+
+### Troubleshooting
+
+| Symptom | What to do |
+|---|---|
+| Graphify executable not found | Install with `uv tool install "graphifyy[openai]"` or `pipx install "graphifyy[openai]"`; ensure `graphify` is on `PATH` or set `GRAPHIFY_EXECUTABLE` |
+| Unsupported Python for Graphify | Use Python 3.10+ for the Graphify tool only; NeuraX can keep an older runtime |
+| LM Studio unavailable | Start LM Studio server on the configured base URL; load a chat model |
+| Empty graph | Ensure corpus has files (upload + process documents first), then rebuild |
+| Graph build timeout | Increase `process_timeout_seconds` / `api_timeout_seconds`; reduce corpus size or concurrency |
+| Corrupted `graph.json` | Rebuild from scratch; check disk space and LM Studio logs |
+
+### Tests
+
+```bash
+# Graphify unit + integration (uses a fake CLI; Graphify package not required)
+pytest tests/test_graphify_service.py tests/test_graphify_regression.py -q
+
+# Existing API suite
+pytest backend/tests -q
 ```
 
 ### Option 2: Manual Installation
@@ -146,11 +295,11 @@ python test_lmstudio_integration.py
 
 ### Basic Document Processing
 ```python
-# Upload documents via Gradio interface
+# Upload documents via the Next.js Documents workspace
 # Supported: PDF, DOCX, DOC, TXT files
 # Automatic text extraction and indexing
 
-# Query your documents
+# Query via Chat workspace or POST /api/chat
 query = "What are the main findings in the research?"
 # System returns relevant passages with citations
 ```
@@ -213,29 +362,68 @@ NeuraX/
 │   ├── metrics_collector.py   # Performance metrics
 │   └── 📁 exports/            # Feedback data exports
 │
-├── 📁 ui/                     # User interfaces
-│   ├── gradio_app.py          # Main web interface
-│   ├── streamlit_dashboard.py # Analytics dashboard
-│   └── demo_gradio_app.py     # Demo interface
+├── 📁 backend/                # FastAPI thin service layer
+│   ├── main.py                # App factory, CORS, lifespan
+│   ├── api/routes/            # HTTP endpoints
+│   ├── services/              # Domain orchestration for HTTP
+│   └── tests/                 # API tests
 │
-├── 📁 tests/                  # Comprehensive test suite
-│   ├── test_*.py              # Unit and integration tests
-│   └── conftest.py            # Test configuration
+├── 📁 frontend/               # Next.js App Router (product UI)
+│   ├── app/                   # Routes (chat, documents, …)
+│   ├── features/              # Feature UI
+│   ├── components/            # Shared UI
+│   └── tests/                 # Playwright tests
 │
+├── 📁 ui/                     # Optional Streamlit analytics
+│   └── streamlit_dashboard.py
+│
+├── 📁 docs/migration/         # Migration notes and parity
 ├── 📁 models/                 # Local model cache (LM Studio managed)
-├── 📁 data/                   # Input data and samples
+├── 📁 data/                   # Input data and uploads
 ├── 📁 vector_db/              # ChromaDB persistent storage
 ├── 📁 cache/                  # Embedding and processing cache
 ├── 📁 logs/                   # System logs and error reports
 │
-├── 🔧 config.py               # Central configuration
-├── 🚀 main_launcher.py        # Application orchestrator
+├── 🔧 config.py               # Central domain configuration
+├── 🚀 main_launcher.py        # Domain runtime / optional Streamlit
 ├── 📋 requirements.txt        # Python dependencies
 ├── 🛠️ install_dependencies.py # Automated setup script
 ├── 📦 build_executables.py    # Portable build script
-├── 🔄 migrate_to_lmstudio.py  # LM Studio migration tool
-└── 🧪 test_*.py              # Verification and test scripts
+├── PRODUCT.md / DESIGN.md     # Product and design direction
+└── scripts/dev.ps1            # Primary: API + Next.js launcher
 ```
+
+## 🧪 Tests
+
+```bash
+# Backend API
+pytest backend/tests -q
+
+# Frontend
+cd frontend
+npm run typecheck
+npm run build
+npx playwright install chromium   # once
+npm run test                      # requires API + frontend running
+```
+
+## 🔌 Offline deployment notes
+
+- Install Python deps, Node deps, embedding models, Whisper, and LM Studio models while online.
+- Run with no required external APIs: frontend → local FastAPI → local Chroma/LM Studio.
+- Bind hosts explicitly for trusted LAN; keep `NEURAX_CORS_ORIGINS` tight (no `*`).
+- Product UI: `pwsh scripts/dev.ps1` or run FastAPI + `npm run dev` in `frontend/`.
+
+## 🩺 Troubleshooting
+
+| Symptom | Check |
+|---|---|
+| Status bar: Backend unavailable | `uvicorn backend.main:app --host 127.0.0.1 --port 8000` |
+| LM Studio unavailable | Local Server on port 1234; load a model |
+| Empty search / weak answers | Index documents first; lower similarity threshold |
+| Upload rejected | Extension allowlist and max size in Settings |
+| CORS errors in browser | `NEURAX_CORS_ORIGINS` includes `http://127.0.0.1:3000` |
+
 
 ## 🔧 Configuration
 
@@ -408,7 +596,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - **Hugging Face**: CLIP and Transformer models
 - **LM Studio**: Local LLM hosting platform
 - **ChromaDB**: Vector database infrastructure
-- **Gradio**: Modern web interface framework
+- **Next.js / FastAPI**: Product web UI and API
 
 ---
 
