@@ -28,7 +28,12 @@ def test_system_status(client):
     assert "backend" in body
     assert "vector_store" in body
     assert "lm_studio" in body
-    assert body["offline_mode"] is True
+    # offline_mode mirrors cloud configuration rather than being constant:
+    # environments with NEURAX_CLOUD_* credentials legitimately report online
+    from config import CLOUD_LLM_CONFIG
+
+    cloud_configured = bool(CLOUD_LLM_CONFIG.get("api_url")) and bool(CLOUD_LLM_CONFIG.get("model"))
+    assert body["offline_mode"] is (not cloud_configured)
 
 
 def test_models_status(client):
