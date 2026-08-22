@@ -67,16 +67,24 @@ CLOUD_LLM_CONFIG = {
     "timeout": int(os.getenv("NEURAX_CLOUD_TIMEOUT", "60")),
 }
 
-# Connectivity default flag: choose offline-first (no cloud rerank by default)
-# or online-first (cloud rerank enabled by default).
-CD_MODE = os.getenv("NEURAX_CD", "offline-first").strip().lower()
-if CD_MODE not in {"offline-first", "online-first"}:
-    CD_MODE = "offline-first"
-CD_ONLINE_FIRST = CD_MODE == "online-first"
+# Deployment strategy — one switch for local-vs-cloud service defaults.
+#   offline_first (default): fully local posture. NIM embeddings and
+#     reranking stay off and chat defaults to LM Studio, unless each
+#     service is explicitly enabled via its own NEURAX_* variable.
+#   online_first: prefer cloud services when credentials exist — NIM
+#     embeddings + reranking default on, chat defaults to cloud mode.
+# NEURAX_CD is accepted as an alias (earlier name for the same switch);
+# hyphenated values normalize to underscores. Explicit NEURAX_* service
+# flags always win over the strategy default.
+STRATEGY = (os.getenv("NEURAX_STRATEGY") or os.getenv("NEURAX_CD") or "offline_first")
+STRATEGY = STRATEGY.strip().lower().replace("-", "_")
+ONLINE_FIRST = STRATEGY in {"online_first", "cloud_first"}
+CHAT_DEFAULT_MODE = "cloud" if ONLINE_FIRST else "local"
 
 # NVIDIA NIM text embeddings (opt-in; leave disabled for the local MiniLM path)
 NIM_EMBEDDING_CONFIG = {
-    "enabled": os.getenv("NEURAX_NIM_EMBEDDINGS_ENABLED", "false").lower() in {"1", "true", "yes", "on"},
+    "enabled": os.getenv("NEURAX_NIM_EMBEDDINGS_ENABLED",
+                         "true" if ONLINE_FIRST else "false").lower() in {"1", "true", "yes", "on"},
     "api_url": os.getenv("NEURAX_NIM_EMBEDDING_API_URL", "https://integrate.api.nvidia.com/v1/embeddings"),
     "api_key": os.getenv("NEURAX_NIM_API_KEY", ""),
     "model": os.getenv("NEURAX_NIM_EMBEDDING_MODEL", "nvidia/nemotron-3-embed-1b"),
@@ -88,7 +96,8 @@ NIM_EMBEDDING_CONFIG = {
 # Cross-encoder reranking of fused retrieval candidates (same NIM key as
 # embeddings; runs after hybrid RRF, before the LLM sees context)
 NIM_RERANK_CONFIG = {
-    "enabled": os.getenv("NEURAX_NIM_RERANK_ENABLED", "true" if CD_ONLINE_FIRST else "false").lower() in {"1", "true", "yes", "on"},
+    "enabled": os.getenv("NEURAX_NIM_RERANK_ENABLED",
+                         "true" if ONLINE_FIRST else "false").lower() in {"1", "true", "yes", "on"},
     "api_url": os.getenv("NEURAX_NIM_RERANK_API_URL", "https://ai.api.nvidia.com/v1/retrieval/nvidia/reranking"),
     "api_key": os.getenv("NEURAX_NIM_API_KEY", ""),
     # Model id must be one the account can invoke on the reranking
@@ -224,7 +233,9 @@ SEARCH_CONFIG = {
     "rrf_k": 20,                    # RRF constant (higher = gentler rank penalty)
     "dense_weight": 0.9,            # Dense-favored fusion: equal weights let BM25
     "sparse_weight": 0.1,           #   misses outrank correct dense picks (see evals/)
-    "enable_reranking": CD_ONLINE_FIRST,  # NIM cross-encoder rerank of fused candidates
+    # Opt-in is two-key: the NIM_RERANK master switch AND a key present.
+    # SEARCH_CONFIG alone must never trigger cloud calls (local-first default).
+    "enable_reranking": NIM_RERANK_CONFIG["enabled"] and bool(NIM_RERANK_CONFIG.get("api_key")),
     "rerank_candidates": 20,        # Fused candidates sent to the reranker
 }
 

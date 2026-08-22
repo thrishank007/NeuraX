@@ -106,7 +106,9 @@ class Retriever:
         self._bm25 = None
         self._reranker = None
         from config import NIM_RERANK_CONFIG
-        if NIM_RERANK_CONFIG.get("enabled") and NIM_RERANK_CONFIG.get("api_key"):
+        # selecting the 'rerank' mode is the opt-in; only a missing key
+        # downgrades it (the enabled flag follows deployment strategy)
+        if NIM_RERANK_CONFIG.get("api_key"):
             try:
                 from retrieval.nim_reranker import NimReranker
                 self._reranker = NimReranker(NIM_RERANK_CONFIG)

@@ -4,6 +4,8 @@ from typing import Any, List, Literal, Optional
 
 from pydantic import BaseModel, Field
 
+from config import CHAT_DEFAULT_MODE
+
 
 class SearchRequest(BaseModel):
     query: str = ""
@@ -39,7 +41,7 @@ class ChatRequest(BaseModel):
     similarity_threshold: Optional[float] = Field(default=None, ge=0.0, le=1.0)
     max_docs: int = Field(default=5, ge=1, le=10)
     use_knowledge_graph: bool = False
-    mode: Literal["local", "cloud"] = "local"
+    mode: Literal["local", "cloud"] = CHAT_DEFAULT_MODE  # type: ignore[assignment]
 
 
 class CitationItem(BaseModel):
