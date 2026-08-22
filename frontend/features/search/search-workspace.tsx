@@ -34,6 +34,7 @@ export function SearchWorkspace() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [time, setTime] = useState<number | null>(null);
+  const [queryType, setQueryType] = useState<string | null>(null);
 
   async function handleSearch() {
     setError(null);
@@ -69,6 +70,7 @@ export function SearchWorkspace() {
       setResults(res.results || []);
       setTranscription(res.transcription || null);
       setTime(res.processing_time);
+      setQueryType(res.query_type || null);
 
       pushQueryHistory({
         query: query.trim() || imageFile?.name || audioFile?.name || "Multimodal Search",
@@ -265,7 +267,12 @@ export function SearchWorkspace() {
         <div className="space-y-3 pt-2">
           <div className="flex items-center justify-between text-xs text-muted font-medium">
             <span>Found {results.length} matched vectors</span>
-            {time != null && <span>Search completed in {time.toFixed(2)}s</span>}
+            {time != null && (
+              <span>
+                {queryType && <span className="text-accent font-semibold">{queryType} · </span>}
+                Search completed in {time.toFixed(2)}s
+              </span>
+            )}
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
