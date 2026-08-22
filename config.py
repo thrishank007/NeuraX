@@ -67,6 +67,13 @@ CLOUD_LLM_CONFIG = {
     "timeout": int(os.getenv("NEURAX_CLOUD_TIMEOUT", "60")),
 }
 
+# Connectivity default flag: choose offline-first (no cloud rerank by default)
+# or online-first (cloud rerank enabled by default).
+CD_MODE = os.getenv("NEURAX_CD", "offline-first").strip().lower()
+if CD_MODE not in {"offline-first", "online-first"}:
+    CD_MODE = "offline-first"
+CD_ONLINE_FIRST = CD_MODE == "online-first"
+
 # NVIDIA NIM text embeddings (opt-in; leave disabled for the local MiniLM path)
 NIM_EMBEDDING_CONFIG = {
     "enabled": os.getenv("NEURAX_NIM_EMBEDDINGS_ENABLED", "false").lower() in {"1", "true", "yes", "on"},
@@ -81,7 +88,7 @@ NIM_EMBEDDING_CONFIG = {
 # Cross-encoder reranking of fused retrieval candidates (same NIM key as
 # embeddings; runs after hybrid RRF, before the LLM sees context)
 NIM_RERANK_CONFIG = {
-    "enabled": os.getenv("NEURAX_NIM_RERANK_ENABLED", "true").lower() in {"1", "true", "yes", "on"},
+    "enabled": os.getenv("NEURAX_NIM_RERANK_ENABLED", "true" if CD_ONLINE_FIRST else "false").lower() in {"1", "true", "yes", "on"},
     "api_url": os.getenv("NEURAX_NIM_RERANK_API_URL", "https://ai.api.nvidia.com/v1/retrieval/nvidia/reranking"),
     "api_key": os.getenv("NEURAX_NIM_API_KEY", ""),
     # Model id must be one the account can invoke on the reranking
@@ -217,7 +224,7 @@ SEARCH_CONFIG = {
     "rrf_k": 20,                    # RRF constant (higher = gentler rank penalty)
     "dense_weight": 0.9,            # Dense-favored fusion: equal weights let BM25
     "sparse_weight": 0.1,           #   misses outrank correct dense picks (see evals/)
-    "enable_reranking": True,       # NIM cross-encoder rerank of fused candidates
+    "enable_reranking": CD_ONLINE_FIRST,  # NIM cross-encoder rerank of fused candidates
     "rerank_candidates": 20,        # Fused candidates sent to the reranker
 }
 
