@@ -66,6 +66,79 @@ def test_chat_empty_query(client):
     assert r.status_code == 422
 
 
+def test_chat_stream_early_return_sse(client, monkeypatch):
+    """LM Studio unreachable: SSE carries retrieval + message + done, no tokens."""
+    from backend.services import chat_service
+
+    def fake_prepare(registry, *, query, **kwargs):
+        return {
+            "early_return": {
+                "query": query,
+                "response": "LM Studio guidance text",
+                "confidence": 0.0,
+                "processing_time": 0.01,
+                "sources": [],
+                "model_used": "",
+                "lm_studio_available": False,
+                "graph_context_used": False,
+                "graph_warning": None,
+            }
+        }
+
+    monkeypatch.setattr(chat_service, "_prepare_chat", fake_prepare)
+    with client.stream("POST", "/api/chat/stream", json={"query": "hi"}) as resp:
+        assert resp.status_code == 200
+        assert resp.headers["content-type"].startswith("text/event-stream")
+        text = "\n".join(resp.iter_lines())
+
+    assert "event: retrieval" in text
+    assert "event: message" in text
+    assert "LM Studio guidance text" in text
+    assert "event: done" in text
+    assert "event: token" not in text
+
+
+def test_chat_stream_tokens_flow_through_sse(client, monkeypatch):
+    """Streaming-capable generator: token deltas precede the final message."""
+    from generation.lmstudio_generator import GeneratedResponse
+    from backend.services import chat_service
+
+    class FakeStreamLLM:
+        def generate_grounded_response_stream(self, query, context):
+            yield "Hel"
+            yield "lo"
+            return GeneratedResponse(
+                response_text="Hello", confidence_score=0.8, processing_time=0.01,
+                context_used=context, grounding_score=0.8, citations_needed=[0],
+                model_used="fake-model",
+            )
+
+    def fake_prepare(registry, *, query, **kwargs):
+        return {
+            "start": 0.0,
+            "lm": {"lm_studio_reachable": True},
+            "llm": FakeStreamLLM(),
+            "citation_gen": None,
+            "context_docs": [{"content": "c", "file_path": "f"}],
+            "raw_results": [],
+            "sources": [],
+            "graph_used": False,
+            "graph_warning": None,
+        }
+
+    monkeypatch.setattr(chat_service, "_prepare_chat", fake_prepare)
+    monkeypatch.setattr(chat_service, "_build_citations", lambda *a, **k: [])
+    with client.stream("POST", "/api/chat/stream", json={"query": "hi"}) as resp:
+        assert resp.status_code == 200
+        text = "\n".join(resp.iter_lines())
+
+    assert '"delta": "Hel"' in text
+    assert '"delta": "lo"' in text
+    assert "event: citations" in text
+    assert "event: done" in text
+    assert text.index("event: token") < text.index("event: message")
+
+
 def test_job_not_found(client):
     r = client.get("/api/index/jobs/does-not-exist")
     assert r.status_code == 404

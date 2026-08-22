@@ -2,8 +2,9 @@
 Cloud LLM generator using OpenAI-compatible API.
 Same interface as LMStudioGenerator — returns GeneratedResponse.
 """
+import json
 import time
-from typing import Dict, List, Optional
+from typing import Dict, Iterator, List, Optional
 
 import requests
 from loguru import logger
@@ -129,6 +130,105 @@ class CloudGenerator:
                 citations_needed=[],
                 model_used=self.model,
             )
+
+    def generate_grounded_response_stream(
+        self,
+        query: str,
+        context: List[Dict],
+        max_length: Optional[int] = None,
+    ) -> Iterator[str]:
+        """Token-streaming variant of generate_grounded_response.
+
+        Yields response tokens as they arrive (SSE deltas); when exhausted,
+        the generator's return value is the same GeneratedResponse the
+        non-streaming call would produce, so citations/confidence behave
+        identically.
+        """
+        start = time.time()
+
+        context_text = "\n\n".join(
+            f"[Source: {doc.get('file_path', 'unknown')}]\n{doc.get('content', '')}"
+            for doc in context
+            if doc.get("content")
+        )
+        if context_text:
+            system_prompt = (
+                "You are a precise, grounded assistant. Answer ONLY from the provided context. "
+                "If the context doesn't contain enough information, say so clearly. "
+                "Cite sources by referencing their file paths."
+            )
+            user_prompt = (
+                f"Context:\n{context_text}\n\n"
+                f"Question: {query}\n\n"
+                "Provide a thorough, grounded answer based only on the context above."
+            )
+            confidence_score = 0.7
+            citations_needed = list(range(len(context)))
+        else:
+            system_prompt = (
+                "You are NeuraX, a helpful, polite AI assistant. "
+                "Answer the user's query clearly and conversationally. "
+                "If the user asks a specific question about documents or facts not provided, clearly state that no relevant documents were found in the index."
+            )
+            user_prompt = query
+            confidence_score = 0.0
+            citations_needed = []
+
+        headers = {"Content-Type": "application/json"}
+        if self.api_key:
+            headers["Authorization"] = f"Bearer {self.api_key}"
+
+        payload = {
+            "model": self.model,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            "max_tokens": max_length or self.max_tokens,
+            "temperature": self.temperature,
+            "stream": True,
+        }
+
+        parts: list[str] = []
+        model_used = self.model
+        resp = requests.post(
+            f"{self.api_url}/chat/completions",
+            headers=headers,
+            json=payload,
+            timeout=self.timeout,
+            stream=True,
+        )
+        resp.raise_for_status()
+        try:
+            for raw_line in resp.iter_lines(decode_unicode=True):
+                if not raw_line or not raw_line.startswith("data:"):
+                    continue
+                data_str = raw_line[len("data:"):].strip()
+                if data_str == "[DONE]":
+                    break
+                try:
+                    chunk = json.loads(data_str)
+                except json.JSONDecodeError:
+                    continue
+                if chunk.get("model"):
+                    model_used = chunk["model"]
+                choices = chunk.get("choices") or []
+                delta = (choices[0].get("delta") or {}).get("content") if choices else None
+                if delta:
+                    parts.append(delta)
+                    yield delta
+        finally:
+            resp.close()
+
+        return GeneratedResponse(
+            response_text="".join(parts),
+            confidence_score=confidence_score,
+            processing_time=time.time() - start,
+            context_used=context,
+            grounding_score=confidence_score,
+            citations_needed=citations_needed,
+            model_used=model_used,
+        )
 
     def generate_summary(self, documents: List[Dict], max_length: int = 300) -> str:
         result = self.generate_grounded_response(

@@ -6,7 +6,7 @@ Supports Gemma (multimodal) as main model and Qwen 4B Thinking as fallback
 import requests
 import json
 import time
-from typing import List, Dict, Optional, Union, Any, Tuple
+from typing import Iterator, List, Dict, Optional, Union, Any, Tuple
 from loguru import logger
 from dataclasses import dataclass
 from PIL import Image
@@ -207,6 +207,105 @@ class LMStudioGenerator:
         except Exception as e:
             logger.error(f"Error generating grounded response: {e}")
             return self._generate_error_response(query, start_time)
+
+    def generate_grounded_response_stream(self, query: str, context: List[Dict],
+                                          max_length: Optional[int] = None) -> Iterator[str]:
+        """Token-streaming variant of generate_grounded_response.
+
+        Yields response tokens as they arrive from LM Studio; when
+        exhausted, the generator's return value is the same
+        GeneratedResponse the non-streaming call would produce, so
+        citations/confidence behave identically. On connection errors the
+        familiar guidance message is yielded as a single delta, matching
+        the non-streaming behavior.
+        """
+        start_time = time.time()
+
+        if not self._has_images_in_context(context):
+            self._switch_model("qwen")
+        else:
+            self._switch_model("gemma")
+
+        context_text = self._prepare_context(context)
+        prompt = self._create_grounded_prompt(query, context_text)
+        model_id = self.current_model or self.qwen_model or self.gemma_model or "unknown-model"
+        payload = {
+            "model": model_id,
+            "messages": [{"role": "user", "content": prompt}],
+            "max_tokens": self.max_tokens,
+            "temperature": self.temperature,
+            "top_p": self.top_p,
+            "stream": True,
+        }
+
+        parts: list[str] = []
+        error_message: Optional[str] = None
+        resp = None
+        try:
+            resp = requests.post(
+                f"{self.base_url}/chat/completions",
+                json=payload,
+                timeout=self.timeout,
+                headers={"Content-Type": "application/json"},
+                stream=True,
+            )
+            if resp.status_code != 200:
+                logger.error(f"LM Studio API error: {resp.status_code} - {resp.text[:200]}")
+                error_message = "I apologize, but I couldn't generate a response."
+            else:
+                for raw_line in resp.iter_lines(decode_unicode=True):
+                    if not raw_line or not raw_line.startswith("data:"):
+                        continue
+                    data_str = raw_line[len("data:"):].strip()
+                    if data_str == "[DONE]":
+                        break
+                    try:
+                        chunk = json.loads(data_str)
+                    except json.JSONDecodeError:
+                        continue
+                    choices = chunk.get("choices") or []
+                    delta = (choices[0].get("delta") or {}).get("content") if choices else None
+                    if delta:
+                        parts.append(delta)
+                        yield delta
+        except requests.exceptions.ConnectionError:
+            logger.error("Could not connect to LM Studio at localhost:1234")
+            error_message = ("LM Studio is unreachable at http://localhost:1234/v1. Please start "
+                             "LM Studio with a model loaded, or switch to Cloud mode in the header above.")
+        except requests.exceptions.Timeout:
+            logger.error("Request to LM Studio timed out")
+            error_message = ("The request to LM Studio timed out. Please check that your model "
+                             "in LM Studio is running and responding.")
+        except Exception as e:
+            logger.error(f"Error in LM Studio streaming generation: {e}")
+            error_message = "I apologize, but I encountered an error while generating a response."
+        finally:
+            if resp is not None:
+                resp.close()
+
+        if error_message:
+            parts.append(error_message)
+            yield error_message
+
+        response_text = "".join(parts)
+        if context:
+            grounding_score = self._validate_response_grounding(response_text, context)
+            citations_needed = self._identify_citation_needs(response_text, context)
+            confidence_score = min(grounding_score, 0.9)
+        else:
+            grounding_score = 0.0
+            citations_needed = []
+            confidence_score = 0.0
+
+        return GeneratedResponse(
+            response_text=response_text,
+            confidence_score=confidence_score,
+            processing_time=time.time() - start_time,
+            context_used=context,
+            grounding_score=grounding_score,
+            citations_needed=citations_needed,
+            model_used=self.current_model or "unknown"
+        )
     
     def generate_multimodal_response(self, query: str, context: List[Dict], 
                                    image: Optional[Union[str, Image.Image]] = None,

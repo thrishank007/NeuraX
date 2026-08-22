@@ -23,15 +23,20 @@ def _citation_to_dict(c: Any) -> dict:
     }
 
 
-def chat(
+def _prepare_chat(
     registry: ComponentRegistry,
     *,
     query: str,
-    similarity_threshold: Optional[float] = None,
-    max_docs: int = 5,
-    use_knowledge_graph: bool = False,
-    mode: str = "local",
+    similarity_threshold: Optional[float],
+    max_docs: int,
+    use_knowledge_graph: bool,
+    mode: str,
 ) -> dict[str, Any]:
+    """Shared retrieval + generator setup for chat() and chat_stream_events().
+
+    Returns either a ready-to-emit payload ('early_return') when generation
+    is impossible, or the pieces both callers need.
+    """
     start = time.time()
     lm = probe_lm_studio()
     graph_warning: Optional[str] = None
@@ -84,19 +89,41 @@ def chat(
     else:
         if not lm["lm_studio_reachable"]:
             return {
-                "query": query,
-                "response": "LM Studio is not running or unreachable at http://localhost:1234/v1. Please start LM Studio with a model loaded, or switch to Cloud mode in the header above.",
-                "citations": [],
-                "confidence": 0.0,
-                "processing_time": time.time() - start,
-                "sources": sources[:max_docs],
-                "model_used": "",
-                "lm_studio_available": False,
-                "graph_context_used": graph_used,
-                "graph_warning": graph_warning,
+                "early_return": {
+                    "query": query,
+                    "response": "LM Studio is not running or unreachable at http://localhost:1234/v1. Please start LM Studio with a model loaded, or switch to Cloud mode in the header above.",
+                    "citations": [],
+                    "confidence": 0.0,
+                    "processing_time": time.time() - start,
+                    "sources": sources[:max_docs],
+                    "model_used": "",
+                    "lm_studio_available": False,
+                    "graph_context_used": graph_used,
+                    "graph_warning": graph_warning,
+                }
             }
         llm, citation_gen = registry.ensure_generation()
-    generated = llm.generate_grounded_response(query=query, context=context_docs)
+
+    return {
+        "start": start,
+        "lm": lm,
+        "llm": llm,
+        "citation_gen": citation_gen,
+        "context_docs": context_docs,
+        "raw_results": raw_results,
+        "sources": sources,
+        "graph_used": graph_used,
+        "graph_warning": graph_warning,
+    }
+
+
+def _build_citations(
+    citation_gen: Any,
+    generated: Any,
+    raw_results: list,
+    max_docs: int,
+    graph_used: bool,
+) -> list[dict]:
     citation_indices = generated.citations_needed if generated.citations_needed else None
     citations = citation_gen.generate_citations(
         response=generated.response_text,
@@ -118,18 +145,45 @@ def chat(
                 "timestamp": "",
             }
         )
+    return citation_dicts
+
+
+def chat(
+    registry: ComponentRegistry,
+    *,
+    query: str,
+    similarity_threshold: Optional[float] = None,
+    max_docs: int = 5,
+    use_knowledge_graph: bool = False,
+    mode: str = "local",
+) -> dict[str, Any]:
+    prep = _prepare_chat(
+        registry,
+        query=query,
+        similarity_threshold=similarity_threshold,
+        max_docs=max_docs,
+        use_knowledge_graph=use_knowledge_graph,
+        mode=mode,
+    )
+    if "early_return" in prep:
+        return prep["early_return"]
+
+    generated = prep["llm"].generate_grounded_response(query=query, context=prep["context_docs"])
+    citations = _build_citations(
+        prep["citation_gen"], generated, prep["raw_results"], max_docs, prep["graph_used"]
+    )
 
     return {
         "query": query,
         "response": generated.response_text,
-        "citations": citation_dicts,
+        "citations": citations,
         "confidence": float(getattr(generated, "confidence_score", 0.0) or 0.0),
-        "processing_time": time.time() - start,
-        "sources": sources[:max_docs],
+        "processing_time": time.time() - prep["start"],
+        "sources": prep["sources"][:max_docs],
         "model_used": getattr(generated, "model_used", "") or "",
-        "lm_studio_available": lm["lm_studio_reachable"],
-        "graph_context_used": graph_used,
-        "graph_warning": graph_warning,
+        "lm_studio_available": prep["lm"]["lm_studio_reachable"],
+        "graph_context_used": prep["graph_used"],
+        "graph_warning": prep["graph_warning"],
     }
 
 
@@ -142,10 +196,11 @@ def chat_stream_events(
     use_knowledge_graph: bool = False,
     mode: str = "local",
 ) -> Generator[dict[str, Any], None, None]:
-    """SSE-friendly event generator. Retrieval behavior identical to chat()."""
+    """SSE event generator. Retrieval identical to chat(); generation
+    streams token-by-token when the active generator supports it."""
     yield {"event": "status", "data": {"phase": "retrieval_started"}}
     try:
-        result = chat(
+        prep = _prepare_chat(
             registry,
             query=query,
             similarity_threshold=similarity_threshold,
@@ -153,33 +208,75 @@ def chat_stream_events(
             use_knowledge_graph=use_knowledge_graph,
             mode=mode,
         )
-        yield {"event": "retrieval", "data": {"sources": result["sources"]}}
-        if result.get("graph_warning") or result.get("graph_context_used"):
+        if "early_return" in prep:
+            result = prep["early_return"]
+            yield {"event": "retrieval", "data": {"sources": result["sources"]}}
             yield {
-                "event": "status",
+                "event": "message",
                 "data": {
-                    "phase": "graph_context",
+                    "response": result["response"],
+                    "confidence": 0.0,
+                    "model_used": "",
+                },
+            }
+            yield {
+                "event": "done",
+                "data": {
+                    "processing_time": result["processing_time"],
+                    "lm_studio_available": False,
                     "graph_context_used": result.get("graph_context_used", False),
                     "graph_warning": result.get("graph_warning"),
                 },
             }
+            return
+
+        yield {"event": "retrieval", "data": {"sources": prep["sources"][:max_docs]}}
+        if prep["graph_warning"] or prep["graph_used"]:
+            yield {
+                "event": "status",
+                "data": {
+                    "phase": "graph_context",
+                    "graph_context_used": prep["graph_used"],
+                    "graph_warning": prep["graph_warning"],
+                },
+            }
         yield {"event": "status", "data": {"phase": "generation_started"}}
+
+        llm = prep["llm"]
+        stream_fn = getattr(llm, "generate_grounded_response_stream", None)
+        if stream_fn is not None:
+            token_gen = stream_fn(query=query, context=prep["context_docs"])
+            while True:
+                try:
+                    delta = next(token_gen)
+                except StopIteration as stop:
+                    generated = stop.value
+                    break
+                yield {"event": "token", "data": {"delta": delta}}
+        else:
+            generated = llm.generate_grounded_response(query=query, context=prep["context_docs"])
+            if generated.response_text:
+                yield {"event": "token", "data": {"delta": generated.response_text}}
+
+        citations = _build_citations(
+            prep["citation_gen"], generated, prep["raw_results"], max_docs, prep["graph_used"]
+        )
         yield {
             "event": "message",
             "data": {
-                "response": result["response"],
-                "confidence": result["confidence"],
-                "model_used": result["model_used"],
+                "response": generated.response_text,
+                "confidence": float(getattr(generated, "confidence_score", 0.0) or 0.0),
+                "model_used": getattr(generated, "model_used", "") or "",
             },
         }
-        yield {"event": "citations", "data": {"citations": result["citations"]}}
+        yield {"event": "citations", "data": {"citations": citations}}
         yield {
             "event": "done",
             "data": {
-                "processing_time": result["processing_time"],
-                "lm_studio_available": result["lm_studio_available"],
-                "graph_context_used": result.get("graph_context_used", False),
-                "graph_warning": result.get("graph_warning"),
+                "processing_time": time.time() - prep["start"],
+                "lm_studio_available": prep["lm"]["lm_studio_reachable"],
+                "graph_context_used": prep["graph_used"],
+                "graph_warning": prep["graph_warning"],
             },
         }
     except Exception as exc:
