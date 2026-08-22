@@ -40,9 +40,13 @@ class ImageProcessor:
             if image.mode != 'RGB':
                 image = image.convert('RGB')
             
-            # Extract text using OCR
-            ocr_text = pytesseract.image_to_string(image, lang='eng')
-            
+            # Extract text using OCR (graceful fallback if Tesseract is not installed)
+            ocr_text = ""
+            try:
+                ocr_text = pytesseract.image_to_string(image, lang='eng').strip()
+            except Exception as ocr_err:
+                logger.warning(f"OCR not available or failed for {image_path}: {ocr_err}")
+
             # Get image metadata
             width, height = image.size
             
@@ -54,11 +58,11 @@ class ImageProcessor:
             return {
                 'file_path': str(image_path),
                 'file_type': 'image',
-                'ocr_text': ocr_text.strip(),
+                'ocr_text': ocr_text,
                 'metadata': {
                     'width': width,
                     'height': height,
-                    'format': image.format,
+                    'format': image.format or image_path.suffix.lstrip('.').upper(),
                     'mode': image.mode,
                     'brightness': float(brightness),
                     'contrast': float(contrast),

@@ -46,9 +46,14 @@ networkx
 plotly
 pyvis
 
-# UI Frameworks
-gradio
+# Optional analytics dashboard (product UI is Next.js)
 streamlit
+
+# FastAPI service layer (Next.js frontend)
+fastapi>=0.110.0
+uvicorn[standard]>=0.27.0
+python-multipart>=0.0.9
+httpx>=0.27.0
 
 # Evaluation
 ragas
@@ -68,4 +73,4 @@ auto-py-to-exe
 # Development
 pytest
 black
-flake8
+flake8rank-bm25>=0.2.2

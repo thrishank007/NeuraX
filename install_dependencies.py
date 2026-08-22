@@ -143,7 +143,7 @@ def verify_installations():
     # Check Python packages
     packages_to_check = [
         "torch", "transformers", "sentence_transformers", 
-        "chromadb", "gradio", "streamlit", "loguru",
+        "chromadb", "streamlit", "loguru", "fastapi", "uvicorn",
         "numpy", "pandas", "PIL", "whisper"
     ]
     

@@ -1,0 +1,65 @@
+{
+  "version": 1,
+  "skills": {
+    "caveman": {
+      "source": "JuliusBrussee/caveman",
+      "sourceType": "github",
+      "skillPath": "skills/caveman/SKILL.md",
+      "computedHash": "723fb2a8bec1156c0f0b5bf020cc739ed09702b7726ec6377480038871339f6e"
+    },
+    "chroma-local": {
+      "source": "chroma-core/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/chroma-local/SKILL.md",
+      "computedHash": "976949166868e0578254efd4794d448345e82e66fd1b285324354c6a40b1af3f"
+    },
+    "fastapi-expert": {
+      "source": "Jeffallan/claude-skills",
+      "sourceType": "github",
+      "skillPath": "skills/fastapi-expert/SKILL.md",
+      "computedHash": "143163b4ba290370782ba5ef96b02f9e02d3cd6b385c2da7f42badecc1fa3cc3"
+    },
+    "hallmark": {
+      "source": "nutlope/hallmark",
+      "sourceType": "github",
+      "skillPath": "skills/hallmark/SKILL.md",
+      "computedHash": "d3a20aae61e43793d74932c92b63bcad5882e73ec1c8545b858910fd95b25136"
+    },
+    "monitoring-expert": {
+      "source": "Jeffallan/claude-skills",
+      "sourceType": "github",
+      "skillPath": "skills/monitoring-expert/SKILL.md",
+      "computedHash": "7dd714ccb8f39bb9885cc5cc08768e50c6886e841c6e134d761f1bc0eafc3314"
+    },
+    "python-pro": {
+      "source": "Jeffallan/claude-skills",
+      "sourceType": "github",
+      "skillPath": "skills/python-pro/SKILL.md",
+      "computedHash": "bfd83668264345dfa519e5d8f339c64ac7d2b883748d85a26015781e9338fcc9"
+    },
+    "rag-architect": {
+      "source": "Jeffallan/claude-skills",
+      "sourceType": "github",
+      "skillPath": "skills/rag-architect/SKILL.md",
+      "computedHash": "d4b6aa4c5db4c92c993a1607c745c57d263414773afa3225bf0f80a95f138067"
+    },
+    "security-reviewer": {
+      "source": "Jeffallan/claude-skills",
+      "sourceType": "github",
+      "skillPath": "skills/security-reviewer/SKILL.md",
+      "computedHash": "cca56045dd49c756546d74d46034c91be2159875e358050d40c7d1905700e8fd"
+    },
+    "sentence-transformers": {
+      "source": "Orchestra-Research/AI-research-SKILLs",
+      "sourceType": "github",
+      "skillPath": "15-rag/sentence-transformers/SKILL.md",
+      "computedHash": "b1ec651d05d41b826f03eaf153444b63891817e82bfdd22db2f08ceda5b1edac"
+    },
+    "test-master": {
+      "source": "Jeffallan/claude-skills",
+      "sourceType": "github",
+      "skillPath": "skills/test-master/SKILL.md",
+      "computedHash": "4ebd69e573e2a5596703340810e734505f102a76062cf836303758addea17cbd"
+    }
+  }
+}
