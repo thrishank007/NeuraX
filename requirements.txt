@@ -70,7 +70,10 @@ loguru
 pyinstaller
 auto-py-to-exe
 
+# Retrieval
+rank-bm25>=0.2.2
+
 # Development
 pytest
 black
-flake8rank-bm25>=0.2.2
+flake8
